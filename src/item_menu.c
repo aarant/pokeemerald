@@ -2412,7 +2412,7 @@ static void Task_KeyItemWheel(u8 taskId) {
     }
     case 1: // process input
     {
-        if (JOY_NEW(B_BUTTON)) {
+        if (JOY_NEW(B_BUTTON) || JOY_NEW(SELECT_BUTTON)) {
             PlaySE(SE_SELECT);
             tState = 3; // destroy and unfreeze
             break;
