@@ -2368,7 +2368,7 @@ static void FreeKeyItemWheelGfx(s16 *data) {
             continue;
         FillWindowPixelBuffer(tIconWindow[i], 0);
         ClearWindowTilemap(tIconWindow[i]);
-        CopyWindowToVram(tIconWindow[i], COPYWIN_GFX);
+        CopyWindowToVram(tIconWindow[i], COPYWIN_MAP);
         RemoveWindow(tIconWindow[i]);
     }
     SetHBlankCallback(NULL);
