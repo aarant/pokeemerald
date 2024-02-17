@@ -2593,7 +2593,7 @@ u32 BattleStringExpandPlaceholders(const u8 *src, u8 *dst)
                 #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
                 if (toCpy != text && *toCpy != CHAR_FIXED_CASE && !(*src & PLACEHOLDER_FIXED_MASK)) {
                     *text = CHAR_FIXED_CASE;
-                    StringCopyN(text+1, toCpy, PLAYER_NAME_LENGTH);
+                    StringCopyN(text+1, toCpy, PLAYER_NAME_LENGTH + 1);
                     toCpy = text;
                 }
                 #endif
