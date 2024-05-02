@@ -3,6 +3,7 @@
 
 extern const u8 gMonIconPaletteIndices[];
 extern const u8 *const gMonIconTable[];
+extern const u8 *const gMonOldIconTable[];
 extern const struct SpritePalette gMonIconPaletteTable[];
 
 const u8 *GetMonIconTiles(u16 species, bool32);
