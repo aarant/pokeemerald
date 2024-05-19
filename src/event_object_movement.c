@@ -20,6 +20,7 @@
 #include "follower_helper.h"
 #include "gpu_regs.h"
 #include "graphics.h"
+#include "link.h"
 #include "mauville_old_man.h"
 #include "metatile_behavior.h"
 #include "overworld.h"
@@ -2045,6 +2046,7 @@ void RemoveFollowingPokemon(void) {
 static bool32 IsFollowerVisible(void) { // Determine whether follower *should* be visible
     return
     !(TestPlayerAvatarFlags(FOLLOWER_INVISIBLE_FLAGS)
+    || InUnionRoom()
     || MetatileBehavior_IsSurfableWaterOrUnderwater(gObjectEvents[gPlayerAvatar.objectEventId].previousMetatileBehavior)
     || MetatileBehavior_IsForcedMovementTile(gObjectEvents[gPlayerAvatar.objectEventId].currentMetatileBehavior));
 }
@@ -2141,7 +2143,7 @@ bool32 CheckMsgCondition(const struct MsgCondition *cond, struct Pokemon *mon, u
     //     break;
     case MSG_COND_NEAR_MB:
         multi = FindMetatileBehaviorWithinRange(
-                    obj->currentCoords.x, obj->currentCoords.y, 
+                    obj->currentCoords.x, obj->currentCoords.y,
                     cond->data.bytes[0], cond->data.bytes[1]);
         if (multi)
             gSpecialVar_Result = multi;
