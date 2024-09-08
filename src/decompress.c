@@ -59,24 +59,24 @@ void LoadCompressedSpriteSheetOverrideBuffer(const struct CompressedSpriteSheet 
     LoadSpriteSheet(&dest);
 }
 
-void LoadCompressedSpritePalette(const struct CompressedSpritePalette *src)
+u8 LoadCompressedSpritePalette(const struct CompressedSpritePalette *src)
 {
     struct SpritePalette dest;
 
     LZ77UnCompWram(src->data, gDecompressionBuffer);
     dest.data = (void *) gDecompressionBuffer;
     dest.tag = src->tag;
-    LoadSpritePalette(&dest);
+    return LoadSpritePalette(&dest);
 }
 
-void LoadCompressedSpritePaletteOverrideBuffer(const struct CompressedSpritePalette *src, void *buffer)
+u8 LoadCompressedSpritePaletteOverrideBuffer(const struct CompressedSpritePalette *src, void *buffer)
 {
     struct SpritePalette dest;
 
     LZ77UnCompWram(src->data, buffer);
     dest.data = buffer;
     dest.tag = src->tag;
-    LoadSpritePalette(&dest);
+    return LoadSpritePalette(&dest);
 }
 
 void DecompressPicFromTable(const struct CompressedSpriteSheet *src, void *buffer, s32 species)
