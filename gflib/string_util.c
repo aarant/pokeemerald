@@ -183,11 +183,11 @@ u16 StringLength(const u8 *str)
 
 s32 StringCompare(const u8 *str1, const u8 *str2)
 {
-    // Ignore leading fixed-case char
+    // Ignore leading fixed-case chars
     #if DECAP_ENABLED
-    if (*str1 == CHAR_FIXED_CASE)
+    while (*str1 == CHAR_FIXED_CASE)
         str1++;
-    if (*str2 == CHAR_FIXED_CASE)
+    while (*str2 == CHAR_FIXED_CASE)
         str2++;
     #endif
     while (*str1 == *str2)
@@ -203,11 +203,11 @@ s32 StringCompare(const u8 *str1, const u8 *str2)
 
 s32 StringCompareN(const u8 *str1, const u8 *str2, u32 n)
 {
-    // Ignore leading fixed-case char
+    // Ignore leading fixed-case chars
     #if DECAP_ENABLED
-    if (*str1 == CHAR_FIXED_CASE)
+    while (*str1 == CHAR_FIXED_CASE)
         str1++;
-    if (*str2 == CHAR_FIXED_CASE)
+    while (*str2 == CHAR_FIXED_CASE)
         str2++;
     #endif
     while (*str1 == *str2)
