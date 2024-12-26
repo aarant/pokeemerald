@@ -825,7 +825,7 @@ static u8 UpdateFastPaletteFade(void)
     return gPaletteFade.active ? PALETTE_FADE_STATUS_ACTIVE : PALETTE_FADE_STATUS_DONE;
 }
 
-void BeginHardwarePaletteFade(u8 blendCnt, u8 delay, u8 y, u8 targetY, u8 shouldResetBlendRegisters)
+void BeginHardwarePaletteFade(u16 blendCnt, u8 delay, u8 y, u8 targetY, u8 shouldResetBlendRegisters)
 {
     gPaletteFade_blendCnt = blendCnt;
     gPaletteFade.delayCounter = delay;
@@ -879,7 +879,8 @@ static u8 UpdateHardwarePaletteFade(void)
     {
         if (gPaletteFade.shouldResetBlendRegisters)
         {
-            gPaletteFade_blendCnt = 0;
+            // clear TGT1
+            gPaletteFade_blendCnt &= ~0xFF;
             gPaletteFade.y = 0;
         }
         gPaletteFade.shouldResetBlendRegisters = FALSE;
