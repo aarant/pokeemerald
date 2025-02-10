@@ -78,6 +78,12 @@ enum FollowerTransformTypes
 #define GROUND_EFFECT_FLAG_HOT_SPRINGS           (1 << 18)
 #define GROUND_EFFECT_FLAG_SEAWEED               (1 << 19)
 
+// Sprite data for the CameraObject functions
+#define sCamera_FollowSpriteId data[0]
+#define sCamera_State          data[1]
+#define sCamera_MoveX          data[2]
+#define sCamera_MoveY          data[3]
+
 struct StepAnimTable
 {
     const union AnimCmd *const *anims;
@@ -135,7 +141,7 @@ u8 TrySpawnObjectEvent(u8 localId, u8 mapNum, u8 mapGroup);
 u8 SpawnSpecialObjectEventParameterized(u8 graphicsId, u8 movementBehavior, u8 localId, s16 x, s16 y, u8 elevation);
 u8 SpawnSpecialObjectEvent(struct ObjectEventTemplate *);
 void SetSpritePosToMapCoords(s16 mapX, s16 mapY, s16 *destX, s16 *destY);
-void CameraObjectReset1(void);
+void CameraObjectReset(void);
 u8 UpdateSpritePaletteByTemplate(const struct SpriteTemplate *, struct Sprite *);
 void ObjectEventSetGraphicsId(struct ObjectEvent *, u8 graphicsId);
 void ObjectEventTurn(struct ObjectEvent *, u8 direction);
@@ -161,6 +167,7 @@ u8 GetWalkInPlaceFastMovementAction(u32);
 u8 GetWalkInPlaceNormalMovementAction(u32);
 u8 GetWalkInPlaceSlowMovementAction(u32);
 u8 GetCollisionAtCoords(struct ObjectEvent *, s16 x, s16 y, u32 dir);
+u32 GetObjectObjectCollidesWith(struct ObjectEvent *objectEvent, s16 x, s16 y, bool32 addCoords);
 void MoveCoords(u8 direction, s16 *x, s16 *y);
 bool8 ObjectEventIsHeldMovementActive(struct ObjectEvent *);
 u8 ObjectEventClearHeldMovementIfFinished(struct ObjectEvent *);
@@ -225,7 +232,7 @@ u16 GetObjectPaletteTag(u8 palSlot);
 void UpdateObjectEventSpriteInvisibility(struct Sprite *sprite, bool8 invisible);
 s16 GetFigure8XOffset(s16 idx);
 s16 GetFigure8YOffset(s16 idx);
-void CameraObjectReset2(void);
+void CameraObjectFreeze(void);
 u8 GetObjectEventBerryTreeId(u8 objectEventId);
 void SetBerryTreeJustPicked(u8 mapId, u8 mapNumber, u8 mapGroup);
 bool8 IsBerryTreeSparkling(u8 localId, u8 mapNum, u8 mapGroup);
@@ -448,7 +455,7 @@ bool8 FollowablePlayerMovement_Step(struct ObjectEvent *, struct Sprite *, u8, b
 bool8 FollowablePlayerMovement_GoSpeed1(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
 bool8 FollowablePlayerMovement_GoSpeed2(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
 bool8 FollowablePlayerMovement_Slide(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
-bool8 fph_IM_DIFFERENT(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
+bool8 FollowablePlayerMovement_JumpInPlace(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
 bool8 FollowablePlayerMovement_GoSpeed4(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
 bool8 FollowablePlayerMovement_Jump(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));
 bool8 CopyablePlayerMovement_Jump2(struct ObjectEvent *, struct Sprite *, u8, bool8(u8));

@@ -486,7 +486,7 @@ static void HandleInputChooseMove(void)
         PlaySE(SE_SELECT);
         if (moveInfo->moves[gMoveSelectionCursor[gActiveBattler]] == MOVE_CURSE)
         {
-            if (moveInfo->monType1 != TYPE_GHOST && moveInfo->monType2 != TYPE_GHOST)
+            if (moveInfo->monTypes[0] != TYPE_GHOST && moveInfo->monTypes[1] != TYPE_GHOST)
                 moveTarget = MOVE_TARGET_USER;
             else
                 moveTarget = MOVE_TARGET_SELECTED;
@@ -2198,17 +2198,24 @@ static void PlayerHandleSwitchInAnim(void)
     gBattlerControllerFuncs[gActiveBattler] = SwitchIn_TryShinyAnimShowHealthbox;
 }
 
-// In normal singles, if follower pokemon is out, have it slide in instead of being thrown
+// In normal singles, if follower pokemon exists,
+// and the pokemon following is being sent out,
+// have it slide in instead of being thrown
 static bool8 ShouldDoSlideInAnim(void) {
     struct ObjectEvent *followerObj = GetFollowerObject();
     if (!followerObj || followerObj->invisible)
         return FALSE;
+
     if (gBattleTypeFlags & (
         BATTLE_TYPE_LINK | BATTLE_TYPE_DOUBLE | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_FIRST_BATTLE |
         BATTLE_TYPE_SAFARI | BATTLE_TYPE_WALLY_TUTORIAL | BATTLE_TYPE_EREADER_TRAINER | BATTLE_TYPE_TWO_OPPONENTS |
         BATTLE_TYPE_INGAME_PARTNER | BATTLE_TYPE_RECORDED | BATTLE_TYPE_TRAINER_HILL)
     )
         return FALSE;
+
+    if (GetFirstLiveMon() != &gPlayerParty[gBattlerPartyIndexes[gActiveBattler]])
+        return FALSE;
+
     return TRUE;
 }
 

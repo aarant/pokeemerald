@@ -240,7 +240,7 @@
 #define OBJ_EVENT_GFX_LINK_RS_MAY                236
 #define OBJ_EVENT_GFX_LUGIA                      237
 #define OBJ_EVENT_GFX_HOOH                       238
-#define OBJ_EVENT_GFX_ANIMATED_BALL              OBJ_EVENT_GFX_ITEM_BALL // replaces ITEM_BALL
+#define OBJ_EVENT_GFX_POKE_BALL                  OBJ_EVENT_GFX_ITEM_BALL // replaces ITEM_BALL
 #define OBJ_EVENT_GFX_OW_MON                     OBJ_EVENT_GFX_REGICE
 
 // NOTE: By default, the max value for NUM_OBJ_EVENT_GFX is 239.
@@ -288,6 +288,33 @@
 // Followers will emerge from the pokeball they are stored in,
 // instead of a normal pokeball
 #define OW_MON_POKEBALLS TRUE
+
+// New/old handling for followers during scripts;
+// TRUE: Script collisions hide follower, FLAG_SAFE_FOLLOWER_MOVEMENT on by default
+// (scripted player movement moves follower too!)
+// FALSE: Script collisions unhandled, FLAG_SAFE_FOLLOWER_MOVEMENT off by default
+#define OW_MON_SCRIPT_MOVEMENT TRUE
+
+// If set, the only pokemon allowed to follow you
+// will be those matching species, met location,
+// and/or met level;
+// These accept vars, too: VAR_TEMP_1, etc
+#define OW_MON_ALLOWED_SPECIES (0)
+#define OW_MON_ALLOWED_MET_LVL (0)
+#define OW_MON_ALLOWED_MET_LOC (0)
+// Examples:
+// Yellow Pikachu:
+// #define OW_MON_ALLOWED_SPECIES (SPECIES_PIKACHU)
+// #define OW_MON_ALLOWED_MET_LVL (0)
+// #define OW_MON_ALLOWED_MET_LOC (MAPSEC_PALLET_TOWN)
+// Hoenn Starter:
+// #define OW_MON_ALLOWED_SPECIES (0)
+// #define OW_MON_ALLOWED_MET_LVL (5)
+// #define OW_MON_ALLOWED_MET_LOC (MAPSEC_ROUTE_101)
+// Species set in VAR_XXXX:
+// #define OW_MON_ALLOWED_SPECIES (VAR_XXXX)
+// #define OW_MON_ALLOWED_MET_LVL (0)
+// #define OW_MON_ALLOWED_MET_LOC (0)
 
 #define SHADOW_SIZE_S   0
 #define SHADOW_SIZE_M   1

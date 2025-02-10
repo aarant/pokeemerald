@@ -75,6 +75,20 @@ A: Configuration for the follower system is mostly in [event_objects.h](include/
 // Followers will emerge from the pokeball they are stored in,
 // instead of a normal pokeball
 #define OW_MON_POKEBALLS TRUE
+
+// New/old handling for followers during scripts;
+// TRUE: Script collisions hide follower, FLAG_SAFE_FOLLOWER_MOVEMENT on by default
+// (scripted player movement moves follower too!)
+// FALSE: Script collisions unhandled, FLAG_SAFE_FOLLOWER_MOVEMENT off by default
+#define OW_MON_SCRIPT_MOVEMENT TRUE
+
+// If set, the only pokemon allowed to follow you
+// will be those matching species, met location,
+// and/or met level;
+// These accept vars, too: VAR_TEMP_1, etc
+#define OW_MON_ALLOWED_SPECIES (0)
+#define OW_MON_ALLOWED_MET_LVL (0)
+#define OW_MON_ALLOWED_MET_LOC (0)
 ```
 
 ### `(lighting)` Q: How do I mark certain colors in a palette as light-blended?

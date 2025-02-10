@@ -5,13 +5,7 @@
 #include "palette.h"
 #include "pokemon_icon.h"
 #include "sprite.h"
-
-#define POKE_ICON_BASE_PAL_TAG 56000
-#define POKE_ICON_SPECIES_BASE_PAL_TAG (POKE_ICON_BASE_PAL_TAG + 16)
-#define POKE_ICON_SPECIES_MAX_PAL_TAG (POKE_ICON_SPECIES_BASE_PAL_TAG + NUM_SPECIES + SPECIES_SHINY_TAG)
-
-#define IS_MON_ICON_TAG(x) (((x) >= POKE_ICON_BASE_PAL_TAG && (x) < POKE_ICON_BASE_PAL_TAG + ARRAY_COUNT(gMonIconPaletteTable)) || \
-                            ((x) >= POKE_ICON_SPECIES_BASE_PAL_TAG && (x) < POKE_ICON_SPECIES_MAX_PAL_TAG))
+#include "constants/pokemon_icon.h"
 
 #define INVALID_ICON_SPECIES SPECIES_OLD_UNOWN_J // Oddly specific, used when an icon should be a ?. Any of the 'old unown' would work
 

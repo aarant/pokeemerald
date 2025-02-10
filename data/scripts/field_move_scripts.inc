@@ -1,3 +1,8 @@
+.macro IsFollowerFieldMoveUser var:req
+callfunc ScrFunc_IsFollowerFieldMoveUser
+.2byte \var
+.endm
+
 @ Interact with cuttable tree
 EventScript_CutTree::
 	lockall
@@ -12,8 +17,7 @@ EventScript_CutTree::
 	msgbox Text_MonUsedFieldMove, MSGBOX_DEFAULT
 	closemessage
 EventScript_CutTreeCommon:
-	callfunc ScrFunc_IsFollowerFieldMoveUser
-	.2byte VAR_0x8004
+	IsFollowerFieldMoveUser VAR_0x8004
 	setfieldeffectargument 3, VAR_0x8004 @ skip pose if so
 	dofieldeffect FLDEFF_USE_CUT_ON_TREE
 	waitstate
@@ -77,8 +81,7 @@ EventScript_RockSmash::
 	closemessage
 EventScript_RockSmashCommon:
 	@ check if follower should use the field move
-	callfunc ScrFunc_IsFollowerFieldMoveUser
-	.2byte VAR_0x8004
+	IsFollowerFieldMoveUser VAR_0x8004
 	setfieldeffectargument 3, VAR_0x8004 @ skip pose if so
 	dofieldeffect FLDEFF_USE_ROCK_SMASH
 	waitstate
@@ -123,7 +126,6 @@ EventScript_FollowerSwap:
 	return
 
 EventScript_FollowerMoveNorth:
-	applymovement OBJ_EVENT_ID_FOLLOWER, Movement_WalkUp
 	applymovement OBJ_EVENT_ID_PLAYER, Movement_WalkDown
 	waitmovement 0
 	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_FaceUp
@@ -131,7 +133,6 @@ EventScript_FollowerMoveNorth:
 	return
 
 EventScript_FollowerMoveEast:
-	applymovement OBJ_EVENT_ID_FOLLOWER, Movement_WalkRight
 	applymovement OBJ_EVENT_ID_PLAYER, Movement_WalkLeft
 	waitmovement 0
 	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_FaceRight
@@ -139,7 +140,6 @@ EventScript_FollowerMoveEast:
 	return
 
 EventScript_FollowerMoveSouth:
-	applymovement OBJ_EVENT_ID_FOLLOWER, Movement_WalkDown
 	applymovement OBJ_EVENT_ID_PLAYER, Movement_WalkUp
 	waitmovement 0
 	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_FaceDown
@@ -147,7 +147,6 @@ EventScript_FollowerMoveSouth:
 	return
 
 EventScript_FollowerMoveWest:
-	applymovement OBJ_EVENT_ID_FOLLOWER, Movement_WalkLeft
 	applymovement OBJ_EVENT_ID_PLAYER, Movement_WalkRight
 	waitmovement 0
 	applymovement OBJ_EVENT_ID_PLAYER, Common_Movement_FaceLeft
@@ -372,6 +371,24 @@ EventScript_CantSurface::
 EventScript_EndSurface::
 	releaseall
 	end
+
+EventScript_DigCommon:
+	callfunc ScrFunc_IsFollowerFieldMoveUser
+	.2byte VAR_0x8004
+	setfieldeffectargument 3, VAR_0x8004 @ skip pose if true
+	dofieldeffect FLDEFF_USE_DIG
+	waitstate
+EventScript_DigSealedChamber:: @ fallthrough
+	setflag FLAG_SAFE_FOLLOWER_MOVEMENT
+	call_if_eq VAR_0x8004, TRUE, EventScript_FollowerFieldMove
+	callnative DoBrailleDigEffect
+	releaseall
+	end
+
+@ Use Dig from party menu
+EventScript_UseDig::
+	lockall
+	goto EventScript_DigCommon
 
 Text_CantDive:
 	.string "The sea is deep here. A POKéMON\n"

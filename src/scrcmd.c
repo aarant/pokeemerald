@@ -23,6 +23,7 @@
 #include "field_tasks.h"
 #include "field_weather.h"
 #include "fieldmap.h"
+#include "gpu_regs.h"
 #include "item.h"
 #include "lilycove_lady.h"
 #include "main.h"
@@ -997,6 +998,20 @@ bool8 ScrCmd_fadeinbgm(struct ScriptContext *ctx)
     return FALSE;
 }
 
+struct ObjectEvent * ScriptHideFollower(void) {
+    struct ObjectEvent *obj = GetFollowerObject();
+
+    if (obj == NULL || obj->invisible)
+        return NULL;
+
+    ClearObjectEventMovement(obj, &gSprites[obj->spriteId]);
+    gSprites[obj->spriteId].animCmdIndex = 0; // Reset start frame of animation
+    // Note: ScriptMovement_ returns TRUE on error
+    if (ScriptMovement_StartObjectMovementScript(obj->localId, obj->mapGroup, obj->mapNum, EnterPokeballMovement))
+        return NULL;
+    return obj;
+}
+
 bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
 {
     u16 localId = VarGet(ScriptReadHalfword(ctx));
@@ -1010,17 +1025,11 @@ bool8 ScrCmd_applymovement(struct ScriptContext *ctx)
     }
     ScriptMovement_StartObjectMovementScript(localId, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, movementScript);
     sMovingNpcId = localId;
-    objEvent = GetFollowerObject();
-    // Force follower into pokeball
-    if (localId != OBJ_EVENT_ID_FOLLOWER
-        && !FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT)
-        && (movementScript < Common_Movement_FollowerSafeStart || movementScript > Common_Movement_FollowerSafeEnd)
-        && (objEvent = GetFollowerObject())
-        && !objEvent->invisible)
+    if (localId != OBJ_EVENT_ID_FOLLOWER &&
+        !FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT)
+        && (movementScript < Common_Movement_FollowerSafeStart || movementScript > Common_Movement_FollowerSafeEnd))
     {
-        ClearObjectEventMovement(objEvent, &gSprites[objEvent->spriteId]);
-        gSprites[objEvent->spriteId].animCmdIndex = 0; // Reset start frame of animation
-        ScriptMovement_StartObjectMovementScript(OBJ_EVENT_ID_FOLLOWER, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, EnterPokeballMovement);
+        ScriptHideFollower();
     }
     return FALSE;
 }
@@ -1240,8 +1249,11 @@ bool8 ScrCmd_lockall(struct ScriptContext *ctx)
     }
     else
     {
+        struct ObjectEvent *followerObj = GetFollowerObject();
         FreezeObjects_WaitForPlayer();
         SetupNativeScript(ctx, IsFreezePlayerFinished);
+        if (FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT) && followerObj) // Unfreeze follower object (conditionally)
+            UnfreezeObjectEvent(followerObj);
         return TRUE;
     }
 }
@@ -2271,7 +2283,7 @@ bool8 ScrCmd_lockfortrainer(struct ScriptContext *ctx)
 }
 
 // This command will set a Pokémon's modernFatefulEncounter bit; there is no similar command to clear it.
-bool8 ScrCmd_setmonmodernfatefulencounter(struct ScriptContext *ctx)
+bool8 ScrCmd_setmodernfatefulencounter(struct ScriptContext *ctx)
 {
     bool8 isModernFatefulEncounter = TRUE;
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
@@ -2280,7 +2292,7 @@ bool8 ScrCmd_setmonmodernfatefulencounter(struct ScriptContext *ctx)
     return FALSE;
 }
 
-bool8 ScrCmd_checkmonmodernfatefulencounter(struct ScriptContext *ctx)
+bool8 ScrCmd_checkmodernfatefulencounter(struct ScriptContext *ctx)
 {
     u16 partyIndex = VarGet(ScriptReadHalfword(ctx));
 
@@ -2367,5 +2379,25 @@ bool8 ScrCmd_warpwhitefade(struct ScriptContext *ctx)
     SetWarpDestination(mapGroup, mapNum, warpId, x, y);
     DoWhiteFadeWarp();
     ResetInitialPlayerAvatarState();
+    return TRUE;
+}
+
+bool8 ScrFunc_hidefollower(struct ScriptContext *ctx) {
+    bool16 wait = VarGet(ScriptReadHalfword(ctx));
+    struct ObjectEvent *obj;
+
+    if ((obj = ScriptHideFollower()) != NULL && wait) {
+        sMovingNpcId = obj->localId;
+        sMovingNpcMapGroup = obj->mapGroup;
+        sMovingNpcMapNum = obj->mapNum;
+        SetupNativeScript(ctx, WaitForMovementFinish);
+    }
+
+    // Just in case, prevent `applymovement`
+    // from hiding the follower again
+    if (obj)
+        FlagSet(FLAG_SAFE_FOLLOWER_MOVEMENT);
+
+    // execute next script command with no delay
     return TRUE;
 }

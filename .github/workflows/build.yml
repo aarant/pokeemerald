@@ -10,10 +10,30 @@ jobs:
     name: Build ROM
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: sudo apt-get install binutils-arm-none-eabi gcc-arm-none-eabi
-      - name: Build & install agbcc
+      - name: Checkout
+        uses: actions/checkout@master
+
+      - name: Checkout syms
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/checkout@master
+        with:
+          path: symbols
+          ref: symbols
+
+      - name: Checkout agbcc
+        uses: actions/checkout@master
+        with:
+          path: agbcc
+          repository: pret/agbcc
+
+      - name: Install binutils
+        run: |
+          sudo apt install gcc-arm-none-eabi binutils-arm-none-eabi libpng-dev
+        # build-essential and git are already installed
+        # gcc-arm-none-eabi is only needed for the modern build
+        # as an alternative to dkP
+
+      - name: Install agbcc
         run: |
           cd ..
           git clone --depth 1 https://github.com/pret/agbcc

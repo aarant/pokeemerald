@@ -237,15 +237,15 @@ EWRAM_DATA u16 gBattleMovePower = 0;
 EWRAM_DATA u16 gMoveToLearn = 0;
 EWRAM_DATA u8 gBattleMonForms[MAX_BATTLERS_COUNT] = {0};
 
-void (*gPreBattleCallback1)(void);
-void (*gBattleMainFunc)(void);
-struct BattleResults gBattleResults;
-u8 gLeveledUpInBattle;
-void (*gBattlerControllerFuncs[MAX_BATTLERS_COUNT])(void);
-u8 gHealthboxSpriteIds[MAX_BATTLERS_COUNT];
-u8 gMultiUsePlayerCursor;
-u8 gNumberOfMovesToChoose;
-u8 gBattleControllerData[MAX_BATTLERS_COUNT]; // Used by the battle controllers to store misc sprite/task IDs for each battler
+COMMON_DATA void (*gPreBattleCallback1)(void) = NULL;
+COMMON_DATA void (*gBattleMainFunc)(void) = NULL;
+COMMON_DATA struct BattleResults gBattleResults = {0};
+COMMON_DATA u8 gLeveledUpInBattle = 0;
+COMMON_DATA void (*gBattlerControllerFuncs[MAX_BATTLERS_COUNT])(void) = {0};
+COMMON_DATA u8 gHealthboxSpriteIds[MAX_BATTLERS_COUNT] = {0};
+COMMON_DATA u8 gMultiUsePlayerCursor = 0;
+COMMON_DATA u8 gNumberOfMovesToChoose = 0;
+COMMON_DATA u8 gBattleControllerData[MAX_BATTLERS_COUNT] = {0}; // Used by the battle controllers to store misc sprite/task IDs for each battler
 
 static const struct ScanlineEffectParams sIntroScanlineParams16Bit =
 {
@@ -1654,7 +1654,9 @@ static void CB2_HandleStartMultiBattle(void)
             gBattleCommunication[MULTIUSE_STATE]++;
         }
         else
+        {
             break;
+        }
         // fall through
     case 3:
         if (IsLinkTaskFinished())
@@ -3107,7 +3109,9 @@ static void BattleStartClearSetData(void)
             gHitMarker |= HITMARKER_NO_ANIMATIONS;
     }
     else if (!(gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED_LINK)) && GetBattleSceneInRecordedBattle())
+    {
         gHitMarker |= HITMARKER_NO_ANIMATIONS;
+    }
 
     gBattleScripting.battleStyle = gSaveBlock2Ptr->optionsBattleStyle;
 
@@ -3366,8 +3370,8 @@ void FaintClearSetData(void)
 
     gBattleResources->flags->flags[gActiveBattler] = 0;
 
-    gBattleMons[gActiveBattler].type1 = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[0];
-    gBattleMons[gActiveBattler].type2 = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[1];
+    gBattleMons[gActiveBattler].types[0] = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[0];
+    gBattleMons[gActiveBattler].types[1] = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[1];
 
     ClearBattlerMoveHistory(gActiveBattler);
     ClearBattlerAbilityHistory(gActiveBattler);
@@ -3434,8 +3438,8 @@ static void BattleIntroDrawTrainersOrMonsSprites(void)
             for (i = 0; i < sizeof(struct BattlePokemon); i++)
                 ptr[i] = gBattleBufferB[gActiveBattler][4 + i];
 
-            gBattleMons[gActiveBattler].type1 = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[0];
-            gBattleMons[gActiveBattler].type2 = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[1];
+            gBattleMons[gActiveBattler].types[0] = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[0];
+            gBattleMons[gActiveBattler].types[1] = gSpeciesInfo[gBattleMons[gActiveBattler].species].types[1];
             gBattleMons[gActiveBattler].ability = GetAbilityBySpecies(gBattleMons[gActiveBattler].species, gBattleMons[gActiveBattler].abilityNum);
             hpOnSwitchout = &gBattleStruct->hpOnSwitchout[GetBattlerSide(gActiveBattler)];
             *hpOnSwitchout = gBattleMons[gActiveBattler].hp;
@@ -3607,7 +3611,9 @@ static void BattleIntroPrintOpponentSendsOut(void)
         return;
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
+    {
         position = B_POSITION_OPPONENT_LEFT;
+    }
     else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_LINK)
     {
         if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_IS_MASTER)
@@ -3616,7 +3622,9 @@ static void BattleIntroPrintOpponentSendsOut(void)
             position = B_POSITION_PLAYER_LEFT;
     }
     else
+    {
         position = B_POSITION_OPPONENT_LEFT;
+    }
 
     PrepareStringBattle(STRINGID_INTROSENDOUT, GetBattlerAtPosition(position));
     gBattleMainFunc = BattleIntroOpponent1SendsOutMonAnimation;
@@ -3627,7 +3635,9 @@ static void BattleIntroOpponent2SendsOutMonAnimation(void)
     u32 position;
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
+    {
         position = B_POSITION_OPPONENT_RIGHT;
+    }
     else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_LINK)
     {
         if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_IS_MASTER)
@@ -3636,7 +3646,9 @@ static void BattleIntroOpponent2SendsOutMonAnimation(void)
             position = B_POSITION_PLAYER_RIGHT;
     }
     else
+    {
         position = B_POSITION_OPPONENT_RIGHT;
+    }
 
     for (gActiveBattler = 0; gActiveBattler < gBattlersCount; gActiveBattler++)
     {
@@ -3664,10 +3676,14 @@ static void BattleIntroOpponent1SendsOutMonAnimation(void)
                 position = B_POSITION_PLAYER_LEFT;
         }
         else
+        {
             position = B_POSITION_OPPONENT_LEFT;
+        }
     }
     else
+    {
         position = B_POSITION_OPPONENT_LEFT;
+    }
 
     if (gBattleControllerExecFlags)
         return;
@@ -3722,7 +3738,9 @@ static void BattleIntroPrintPlayerSendsOut(void)
         u8 position;
 
         if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
+        {
             position = B_POSITION_PLAYER_LEFT;
+        }
         else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_LINK)
         {
             if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_IS_MASTER)
@@ -3731,7 +3749,9 @@ static void BattleIntroPrintPlayerSendsOut(void)
                 position = B_POSITION_OPPONENT_LEFT;
         }
         else
+        {
             position = B_POSITION_PLAYER_LEFT;
+        }
 
         if (!(gBattleTypeFlags & BATTLE_TYPE_SAFARI))
             PrepareStringBattle(STRINGID_INTROSENDOUT, GetBattlerAtPosition(position));
@@ -3745,7 +3765,9 @@ static void BattleIntroPlayer2SendsOutMonAnimation(void)
     u32 position;
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
+    {
         position = B_POSITION_PLAYER_RIGHT;
+    }
     else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_LINK)
     {
         if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_IS_MASTER)
@@ -3754,7 +3776,9 @@ static void BattleIntroPlayer2SendsOutMonAnimation(void)
             position = B_POSITION_OPPONENT_RIGHT;
     }
     else
+    {
         position = B_POSITION_PLAYER_RIGHT;
+    }
 
     for (gActiveBattler = 0; gActiveBattler < gBattlersCount; gActiveBattler++)
     {
@@ -3777,7 +3801,9 @@ static void BattleIntroPlayer1SendsOutMonAnimation(void)
     u32 position;
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
+    {
         position = B_POSITION_PLAYER_LEFT;
+    }
     else if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_LINK)
     {
         if (gBattleTypeFlags & BATTLE_TYPE_RECORDED_IS_MASTER)
@@ -3786,7 +3812,9 @@ static void BattleIntroPlayer1SendsOutMonAnimation(void)
             position = B_POSITION_OPPONENT_LEFT;
     }
     else
+    {
         position = B_POSITION_PLAYER_LEFT;
+    }
 
     if (gBattleControllerExecFlags)
         return;
@@ -4196,8 +4224,8 @@ static void HandleTurnActionSelectionState(void)
                         struct ChooseMoveStruct moveInfo;
 
                         moveInfo.species = gBattleMons[gActiveBattler].species;
-                        moveInfo.monType1 = gBattleMons[gActiveBattler].type1;
-                        moveInfo.monType2 = gBattleMons[gActiveBattler].type2;
+                        moveInfo.monTypes[0] = gBattleMons[gActiveBattler].types[0];
+                        moveInfo.monTypes[1] = gBattleMons[gActiveBattler].types[1];
 
                         for (i = 0; i < MAX_MON_MOVES; i++)
                         {
@@ -4701,7 +4729,9 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
                 moveBattler1 = gBattleMons[battler1].moves[*(gBattleStruct->chosenMovePositions + battler1)];
         }
         else
+        {
             moveBattler1 = MOVE_NONE;
+        }
 
         if (gChosenActionByBattler[battler2] == B_ACTION_USE_MOVE)
         {
@@ -4711,7 +4741,9 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
                 moveBattler2 = gBattleMons[battler2].moves[*(gBattleStruct->chosenMovePositions + battler2)];
         }
         else
+        {
             moveBattler2 = MOVE_NONE;
+        }
     }
 
     // both move priorities are different than 0
@@ -4728,7 +4760,9 @@ u8 GetWhoStrikesFirst(u8 battler1, u8 battler2, bool8 ignoreChosenMoves)
             // else battler1 has more speed
         }
         else if (gBattleMoves[moveBattler1].priority < gBattleMoves[moveBattler2].priority)
+        {
             strikesFirst = 1; // battler2's move has greater priority
+        }
 
         // else battler1's move has greater priority
     }

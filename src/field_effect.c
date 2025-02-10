@@ -1295,7 +1295,8 @@ static void CreateHofMonitorSprite(s16 taskId, s16 x, s16 y, bool8 isSmallMonito
     {
         spriteId = CreateSpriteAtEnd(&sSpriteTemplate_HofMonitorBig, x, y, 0);
         SetSubspriteTables(&gSprites[spriteId], &sSubspriteTable_HofMonitorBig);
-    } else
+    }
+    else
     {
         spriteId = CreateSpriteAtEnd(&sSpriteTemplate_HofMonitorSmall, x, y, 0);
     }
@@ -1446,7 +1447,7 @@ static bool8 FallWarpEffect_Init(struct Task *task)
     struct Sprite *playerSprite;
     playerObject = &gObjectEvents[gPlayerAvatar.objectEventId];
     playerSprite = &gSprites[gPlayerAvatar.spriteId];
-    CameraObjectReset2();
+    CameraObjectFreeze();
     gObjectEvents[gPlayerAvatar.objectEventId].invisible = TRUE;
     gPlayerAvatar.preventStep = TRUE;
     ObjectEventSetHeldMovement(playerObject, GetFaceDirectionMovementAction(GetPlayerFacingDirection()));
@@ -1542,7 +1543,7 @@ static bool8 FallWarpEffect_End(struct Task *task)
 {
     gPlayerAvatar.preventStep = FALSE;
     UnlockPlayerFieldControls();
-    CameraObjectReset1();
+    CameraObjectReset();
     UnfreezeObjectEvents();
     InstallCameraPanAheadCallback();
     DestroyTask(FindTaskIdByFunc(Task_FallWarpFieldEffect));
@@ -1589,7 +1590,7 @@ static void Task_EscalatorWarpOut(u8 taskId)
 static bool8 EscalatorWarpOut_Init(struct Task *task)
 {
     FreezeObjectEvents();
-    CameraObjectReset2();
+    CameraObjectFreeze();
     StartEscalator(task->tGoingUp);
     HideFollowerForFieldEffect(); // Hide follower before warping
     task->tState++;
@@ -1722,7 +1723,7 @@ static bool8 EscalatorWarpIn_Init(struct Task *task)
     s16 x;
     s16 y;
     u8 behavior;
-    CameraObjectReset2();
+    CameraObjectFreeze();
     objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     ObjectEventSetHeldMovement(objectEvent, GetFaceDirectionMovementAction(DIR_EAST));
     PlayerGetDestCoords(&x, &y);
@@ -1822,7 +1823,7 @@ static bool8 EscalatorWarpIn_End(struct Task *task)
     objectEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
     if (ObjectEventClearHeldMovementIfFinished(objectEvent))
     {
-        CameraObjectReset1();
+        CameraObjectReset();
         UnlockPlayerFieldControls();
         ObjectEventSetHeldMovement(objectEvent, GetWalkNormalMovementAction(DIR_EAST));
         DestroyTask(FindTaskIdByFunc(Task_EscalatorWarpIn));
@@ -1968,7 +1969,7 @@ static void Task_LavaridgeGymB1FWarp(u8 taskId)
 static bool8 LavaridgeGymB1FWarpEffect_Init(struct Task *task, struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     FreezeObjectEvents();
-    CameraObjectReset2();
+    CameraObjectFreeze();
     SetCameraPanningCallback(NULL);
     gPlayerAvatar.preventStep = TRUE;
     objectEvent->fixedPriority = 1;
@@ -2016,7 +2017,8 @@ static bool8 LavaridgeGymB1FWarpEffect_Rise(struct Task *task, struct ObjectEven
         {
             task->data[1] <<= 1;
         }
-    } else if (!(task->data[2] & 4) && (task->data[1] > 0))
+    }
+    else if (!(task->data[2] & 4) && (task->data[1] > 0))
     {
         task->data[1] >>= 1;
     }
@@ -2030,7 +2032,8 @@ static bool8 LavaridgeGymB1FWarpEffect_Rise(struct Task *task, struct ObjectEven
             {
                 task->data[3]++;
             }
-        } else
+        }
+        else
         {
             task->data[4] = 1;
         }
@@ -2085,7 +2088,7 @@ static void Task_LavaridgeGymB1FWarpExit(u8 taskId)
 
 static bool8 LavaridgeGymB1FWarpExitEffect_Init(struct Task *task, struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    CameraObjectReset2();
+    CameraObjectFreeze();
     FreezeObjectEvents();
     gPlayerAvatar.preventStep = TRUE;
     objectEvent->invisible = TRUE;
@@ -2114,7 +2117,7 @@ static bool8 LavaridgeGymB1FWarpExitEffect_PopOut(struct Task *task, struct Obje
     {
         task->data[0]++;
         objectEvent->invisible = FALSE;
-        CameraObjectReset1();
+        CameraObjectReset();
         PlaySE(SE_M_DIG);
         ObjectEventSetHeldMovement(objectEvent, GetJumpMovementAction(DIR_EAST));
     }
@@ -2163,7 +2166,7 @@ static void Task_LavaridgeGym1FWarp(u8 taskId)
 static bool8 LavaridgeGym1FWarpEffect_Init(struct Task *task, struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     FreezeObjectEvents();
-    CameraObjectReset2();
+    CameraObjectFreeze();
     gPlayerAvatar.preventStep = TRUE;
     objectEvent->fixedPriority = 1;
     task->data[0]++;
@@ -2184,7 +2187,8 @@ static bool8 LavaridgeGym1FWarpEffect_AshPuff(struct Task *task, struct ObjectEv
             gFieldEffectArguments[3] = sprite->oam.priority;
             task->data[1] = FieldEffectStart(FLDEFF_ASH_PUFF);
             task->data[0]++;
-        } else
+        }
+        else
         {
             task->data[1]++;
             ObjectEventSetHeldMovement(objectEvent, GetWalkInPlaceFasterMovementAction(objectEvent->facingDirection));
@@ -2386,7 +2390,7 @@ static void TeleportWarpOutFieldEffect_Init(struct Task *task)
 {
     LockPlayerFieldControls();
     FreezeObjectEvents();
-    CameraObjectReset2();
+    CameraObjectFreeze();
     task->data[15] = GetPlayerFacingDirection();
     task->tState++;
 }
@@ -2468,7 +2472,7 @@ static void FieldCallback_TeleportWarpIn(void)
     FreezeObjectEvents();
     gFieldCallback = NULL;
     gObjectEvents[gPlayerAvatar.objectEventId].invisible = TRUE;
-    CameraObjectReset2();
+    CameraObjectFreeze();
     CreateTask(Task_TeleportWarpIn, 0);
 }
 
@@ -2512,10 +2516,11 @@ static void TeleportWarpInFieldEffect_SpinEnter(struct Task *task)
         if (task->data[13] == 0)
         {
             task->data[13]++;
-            objectEvent->triggerGroundEffectsOnMove = 1;
+            objectEvent->triggerGroundEffectsOnMove = TRUE;
             sprite->subspriteMode = task->data[14];
         }
-    } else
+    }
+    else
     {
         sprite->oam.priority = 1;
         if (sprite->subspriteMode != SUBSPRITES_OFF)
@@ -2552,7 +2557,7 @@ static void TeleportWarpInFieldEffect_SpinGround(struct Task *task)
         if ((++task->data[2]) > 4 && task->data[14] == objectEvent->facingDirection)
         {
             UnlockPlayerFieldControls();
-            CameraObjectReset1();
+            CameraObjectReset();
             UnfreezeObjectEvents();
             DestroyTask(FindTaskIdByFunc(Task_TeleportWarpIn));
         }
@@ -3100,7 +3105,7 @@ u8 FldEff_RayquazaSpotlight(void)
     struct Sprite *sprite = &gSprites[spriteId];
 
     sprite->oam.priority = 1;
-    sprite->oam.paletteNum = 4; // TODO: What (dynamic) palette should this Raquaza use?
+    sprite->oam.paletteNum = 4;
     sprite->data[0] = 0;
     sprite->data[1] = 0;
     sprite->data[2] = 0;
@@ -3288,7 +3293,7 @@ static void FlyOutFieldEffect_FlyOffWithBird(struct Task *task)
         objectEvent->inanimate = FALSE;
         objectEvent->hasShadow = FALSE;
         SetFlyBirdPlayerSpriteId(task->tBirdSpriteId, objectEvent->spriteId);
-        CameraObjectReset2();
+        CameraObjectFreeze();
         task->tState++;
     }
 }
@@ -3503,7 +3508,7 @@ static void FlyInFieldEffect_BirdSwoopDown(struct Task *task)
             SetSurfBlob_BobState(objectEvent->fieldEffectSpriteId, BOB_NONE);
         }
         ObjectEventSetGraphicsId(objectEvent, GetPlayerAvatarGraphicsIdByStateId(PLAYER_AVATAR_STATE_SURFING));
-        CameraObjectReset2();
+        CameraObjectFreeze();
         ObjectEventTurn(objectEvent, DIR_WEST);
         StartSpriteAnim(&gSprites[objectEvent->spriteId], ANIM_GET_ON_OFF_POKEMON_WEST);
         objectEvent->invisible = FALSE;
