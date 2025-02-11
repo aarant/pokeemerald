@@ -3660,7 +3660,7 @@ static void Task_NameBox(u8 taskId)
     {
     case 0:
         SaveMovingMon();
-        BeginHardwarePaletteFade(0xFF, 0, 0, 16, TRUE);
+        BeginHardwarePaletteFade(0xFFFF, 0, 0, 16, TRUE);
         sStorage->state++;
         break;
     case 1:
@@ -3683,7 +3683,7 @@ static void Task_ShowMonSummary(u8 taskId)
     {
     case 0:
         InitSummaryScreenData();
-        BeginHardwarePaletteFade(0xFF, 0, 0, 16, TRUE);
+        BeginHardwarePaletteFade(0xFFFF, 0, 0, 16, TRUE);
         sStorage->state++;
         break;
     case 1:
@@ -3705,7 +3705,7 @@ static void Task_GiveItemFromBag(u8 taskId)
     switch (sStorage->state)
     {
     case 0:
-        BeginHardwarePaletteFade(0xFF, 0, 0, 16, TRUE);
+        BeginHardwarePaletteFade(0xFFFF, 0, 0, 16, TRUE);
         sStorage->state++;
         break;
     case 1:
