@@ -24,12 +24,13 @@
 #include <cstdint>
 #include <string>
 #include "preproc.h"
+#include "utf8.h"
 
 class StringParser
 {
 public:
     StringParser(char* buffer, long size) : m_buffer(buffer), m_size(size), m_pos(0) {}
-    int ParseString(long srcPos, unsigned char* dest, int &destLength);
+    int ParseString(long srcPos, unsigned char* dest, int &destLength, bool initFixedCase);
 
 private:
     struct Integer
@@ -41,6 +42,9 @@ private:
     char* m_buffer;
     long m_size;
     long m_pos;
+    bool fixedCase;
+    UnicodeChar lastChar;
+    UnicodeChar nextLastChar;
 
     Integer ReadInteger();
     Integer ReadDecimal();

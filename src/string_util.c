@@ -25,55 +25,10 @@ static const s32 sPowersOfTen[] =
     1000000000,
 };
 
-#if DECAP_ENABLED
-// Tries to determine whether `str` is safe to prepend a ctrl char to
-// gStringVarX are always safe, as well as stack allocated IWRAM
-// (if `length mod 4` is 1 or 2)
-bool32 IsStringAddrSafe(u8 *str, u32 length) {
-    if (((u32)str) >> 24 == 3)
-        return (str >= gStackBase && (length & 3) && (length & 3) <= 2);
-    return (str >= gStringVar1 && str < sUnknownStringVar);
-}
-
-// Trim leading CHAR_*_CASE from string in-place
-u8 TrimCaseChars(u8 *str, s32 length) {
-    u8 rtn = 0;
-    s32 i = 0;
-    s32 j;
-
-    // Traverse leading case chars
-    while (i < length) {
-        if (str[i] == CHAR_FIXED_CASE)
-            rtn = str[i++];
-        // None; no changes needed
-        else if (i == 0)
-            return 0;
-        else
-            break;
-    }
-    length -= i;
-    if (length < 0) // failsafe
-        return 0;
-
-    for (j = 0; j < length; i++, j++)
-        str[j] = str[i];
-    str[j] = EOS;
-
-    return rtn;
-}
-#endif
-
 u8 *StringCopy_Nickname(u8 *dest, const u8 *src)
 {
     u32 i;
     u32 limit = POKEMON_NAME_LENGTH;
-
-    #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
-    if (IsStringAddrSafe(dest, limit) && *src != CHAR_FIXED_CASE)
-        *dest++ = CHAR_FIXED_CASE;
-    else if (*src == CHAR_FIXED_CASE)
-        *dest++ = *src++;
-    #endif
 
     for (i = 0; i < limit; i++)
     {
@@ -92,7 +47,7 @@ u8 *StringGet_Nickname(u8 *str)
     u8 i;
     u32 limit = POKEMON_NAME_LENGTH;
 
-    #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
+    #if (DECAP_ENABLED)
     if (*str == CHAR_FIXED_CASE)
         str++;
     #endif
@@ -110,11 +65,6 @@ u8 *StringCopy_PlayerName(u8 *dest, const u8 *src)
     s32 i;
     s32 limit = PLAYER_NAME_LENGTH;
 
-    #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
-    if (IsStringAddrSafe(dest, limit) && *src != CHAR_FIXED_CASE)
-        *dest++ = CHAR_FIXED_CASE;
-    #endif
-
     for (i = 0; i < limit; i++)
     {
         dest[i] = src[i];
@@ -129,11 +79,6 @@ u8 *StringCopy_PlayerName(u8 *dest, const u8 *src)
 
 u8 *StringCopy(u8 *dest, const u8 *src)
 {
-    #if (DECAP_ENABLED) && (DECAP_MIRRORING)
-    // If `src` is mirrored, prepend fixed-case char
-    if (IsMirrorPtr(src) && *src != CHAR_FIXED_CASE)
-        *dest++ = CHAR_FIXED_CASE;
-    #endif
     while (*src != EOS)
     {
         *dest = *src;
@@ -408,9 +353,6 @@ u8 *ConvertIntToHexStringN(u8 *dest, s32 value, enum StringConvertMode mode, u8 
 
 u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
 {
-    #if DECAP_ENABLED
-    bool32 fixedCase = FALSE;
-    #endif
     for (;;)
     {
         u8 c = *src++;
@@ -421,17 +363,6 @@ u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
         {
         case PLACEHOLDER_BEGIN:
             placeholderId = *src++;
-            #if DECAP_ENABLED
-            // Handle fixed-case versions of placeholders
-            if (!fixedCase && (placeholderId & PLACEHOLDER_FIXED_MASK || placeholderId == PLACEHOLDER_ID_PLAYER)) {
-                *dest++ = CHAR_FIXED_CASE;
-                expandedString = GetExpandedPlaceholder(placeholderId & ~PLACEHOLDER_FIXED_MASK);
-                dest = StringExpandPlaceholders(dest, expandedString);
-                *dest++ = CHAR_UNFIX_CASE;
-                *dest = EOS;
-                break;
-            }
-            #endif
             expandedString = GetExpandedPlaceholder(placeholderId & ~PLACEHOLDER_FIXED_MASK);
             dest = StringExpandPlaceholders(dest, expandedString);
             break;
@@ -459,22 +390,8 @@ u8 *StringExpandPlaceholders(u8 *dest, const u8 *src)
             }
             break;
         case EOS:
-        #if DECAP_ENABLED
-            if (fixedCase)
-                *dest++ = CHAR_UNFIX_CASE;
             *dest = EOS;
             return dest;
-        case CHAR_UNFIX_CASE:
-            fixedCase = FALSE;
-            *dest++ = c;
-            break;
-        case CHAR_FIXED_CASE:
-            fixedCase = TRUE;
-        // fallthrough
-        #else
-            *dest = EOS;
-            return dest;
-        #endif
         case CHAR_PROMPT_SCROLL:
         case CHAR_PROMPT_CLEAR:
         case CHAR_NEWLINE:

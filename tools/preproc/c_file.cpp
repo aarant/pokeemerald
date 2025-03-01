@@ -32,6 +32,8 @@
 #include "string_parser.h"
 #include "io.h"
 
+#include "../../include/constants/decap_config.h"
+
 CFile::CFile(const char * filenameCStr, bool isStdin)
 {
     if (isStdin)
@@ -155,7 +157,11 @@ void CFile::TryConvertString()
     long oldPos = m_pos;
     long oldLineNum = m_lineNum;
     bool noTerminator = false;
+    #if (DECAP_ENABLED)
     bool fixedCase = false;
+    #else
+    bool fixedCase = true;
+    #endif
 
     if (m_buffer[m_pos] != '_' || (m_pos > 0 && IsIdentifierChar(m_buffer[m_pos - 1])))
         return;
@@ -202,13 +208,7 @@ void CFile::TryConvertString()
 
             try
             {
-                if (fixedCase) {
-                    s[0] = '\x7d'; // FIXED_CASE
-                    m_pos += stringParser.ParseString(m_pos, s+1, length);
-                    length++;
-                } else {
-                    m_pos += stringParser.ParseString(m_pos, s, length);
-                }
+                m_pos += stringParser.ParseString(m_pos, s, length, fixedCase);
             }
             catch (std::runtime_error& e)
             {

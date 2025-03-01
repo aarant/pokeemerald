@@ -76,17 +76,15 @@ void PreprocAsmFile(std::string filename, bool isStdin, bool doEnum)
         case Directive::String:
         {
             unsigned char s[kMaxStringLength];
-            int length = stack.top().ReadString(s);
+            int length = stack.top().ReadString(s, false);
             PrintAsmBytes(s, length);
             break;
         }
-        // Like String, but prepends FIXED_CASE char
+        // Like String, but don't decapitalize
         case Directive::FixedString:
         {
             unsigned char s[kMaxStringLength];
-            int length = 0;
-            s[length++] = '\x7d'; // FIXED_CASE
-            length += stack.top().ReadString(s+length);
+            int length = stack.top().ReadString(s, true);
             PrintAsmBytes(s, length);
             break;
         }

@@ -707,38 +707,11 @@ static void UpdateSaveAddresses(void)
     }
 }
 
-// trim leading case chars and embed at end of name, for saving
-static u8 ConvertPlayerNameToSave(void) {
-    u8 leadChar = TrimCaseChars(gSaveBlock2Ptr->playerName, PLAYER_NAME_LENGTH);
-    if (leadChar == CHAR_FIXED_CASE)
-        gSaveBlock2Ptr->playerName[PLAYER_NAME_LENGTH] = leadChar;
-    return leadChar;
-}
-
-static u8 ConvertPlayerNameFromSave(void) {
-    u8 tempName[ARRAY_COUNT(gSaveBlock2Ptr->playerName)] = {EOS};
-    // already fixed-case
-    if ((DECAP_NICKNAMES) || gSaveBlock2Ptr->playerName[0] == CHAR_FIXED_CASE)
-        return gSaveBlock2Ptr->playerName[0];
-    // no space to prepend
-    else if (gSaveBlock2Ptr->playerName[PLAYER_NAME_LENGTH - 1] != EOS)
-        return 0;
-
-    tempName[0] = CHAR_FIXED_CASE;
-    StringCopyN(&tempName[1], gSaveBlock2Ptr->playerName, PLAYER_NAME_LENGTH);
-    StringCopyN(gSaveBlock2Ptr->playerName, tempName, ARRAY_COUNT(tempName));
-
-    return tempName[0];
-}
-
 u8 HandleSavingData(u8 saveType)
 {
     u8 i;
     u32 *backupVar = gTrainerHillVBlankCounter;
     u8 *tempAddr;
-
-    if (DECAP_ENABLED)
-        ConvertPlayerNameToSave();
 
     gTrainerHillVBlankCounter = NULL;
     UpdateSaveAddresses();
@@ -789,9 +762,6 @@ u8 HandleSavingData(u8 saveType)
         break;
     }
     gTrainerHillVBlankCounter = backupVar;
-
-    if (DECAP_ENABLED)
-        ConvertPlayerNameFromSave();
 
     return 0;
 }
@@ -864,9 +834,6 @@ u8 WriteSaveBlock2(void)
     if (gFlashMemoryPresent != TRUE)
         return TRUE;
 
-    if (DECAP_ENABLED)
-        ConvertPlayerNameToSave();
-
     UpdateSaveAddresses();
     CopyPartyAndObjectsToSave();
     RestoreSaveBackupVars(gRamSaveSectorLocations);
@@ -874,9 +841,6 @@ u8 WriteSaveBlock2(void)
     // Because RestoreSaveBackupVars is called immediately prior, gIncrementalSectorId will always be 0 below,
     // so this function only saves the first sector (SECTOR_ID_SAVEBLOCK2)
     HandleReplaceSectorAndVerify(gIncrementalSectorId + 1, gRamSaveSectorLocations);
-
-    if (DECAP_ENABLED)
-        ConvertPlayerNameFromSave();
 
     return FALSE;
 }
@@ -926,9 +890,6 @@ u8 LoadGameSave(u8 saveType)
     default:
         status = TryLoadSaveSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
         CopyPartyAndObjectsFromSave();
-
-        if (DECAP_ENABLED)
-            ConvertPlayerNameFromSave();
 
         gSaveFileStatus = status;
         gGameContinueCallback = 0;
@@ -1046,9 +1007,6 @@ void Task_LinkFullSave(u8 taskId)
         if (!tInBattleTower)
             SetContinueGameWarpStatusToDynamicWarp();
 
-        if (DECAP_ENABLED)
-            ConvertPlayerNameToSave();
-
         LinkFullSave_Init();
         tState = 4;
         break;
@@ -1093,10 +1051,6 @@ void Task_LinkFullSave(u8 taskId)
     case 11:
         if (++tTimer > 5)
         {
-
-            if (DECAP_ENABLED)
-                ConvertPlayerNameFromSave();
-
             gSoftResetDisabled = FALSE;
             DestroyTask(taskId);
         }

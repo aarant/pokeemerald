@@ -29,6 +29,8 @@
 #include "../../include/constants/characters.h"
 #include "io.h"
 
+#include "../../include/constants/decap_config.h"
+
 AsmFile::AsmFile(std::string filename, bool isStdin, bool doEnum) : m_filename(filename)
 {
     m_buffer = ReadFileToBuffer(filename.c_str(), isStdin, &m_size);
@@ -243,16 +245,21 @@ std::string AsmFile::ReadPath()
 }
 
 // Reads a charmap string.
-int AsmFile::ReadString(unsigned char* s)
+int AsmFile::ReadString(unsigned char* s, bool initFixedCase)
 {
     SkipWhitespace();
 
     int length;
     StringParser stringParser(m_buffer, m_size);
+    #if (DECAP_ENABLED) && (DECAP_FIELD_MSG)
+    bool fixedCase = initFixedCase;
+    #else
+    bool fixedCase = true;
+    #endif
 
     try
     {
-        m_pos += stringParser.ParseString(m_pos, s, length);
+        m_pos += stringParser.ParseString(m_pos, s, length, fixedCase);
     }
     catch (std::runtime_error& e)
     {

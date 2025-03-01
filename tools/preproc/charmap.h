@@ -25,6 +25,29 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <set>
+
+/**
+ * Bigrams (two-letter words) whose case should be preserved.
+ * I.e, if 'TV' is surrounded by word-separators on both sides, keep it!
+ * 
+ * Maps the first letter to a set of possible second letters.
+ */
+const std::map<std::int32_t, std::set<std::int32_t>> sBigramExceptions = {
+    {'A', {'I'}},
+    {'B', {'P'}}, // (B)attle (P)oints
+    {'H', {'M', 'P'}}, // HM, HP
+    {'I', {'D'}},
+    {'K', {'O'}},
+    {'L', {'R'}},
+    {'M', {'B', 'C'}}, // (M)ega (B)ytes, (M)aster of (C)eremonies
+    {'O', {'T'}}, // (O)riginal (T)rainer
+    {'P', {'C', 'P'}}, // PC, PP
+    {'T', {'M', 'V'}}, // TM, TV
+    {'U', {'V'}}, // (U)ltra (V)iolet?
+    {'V', {'U'}}, // (V)olume (U)nit
+    {'X', {'L', 'S'}}, // XL, XS
+};
 
 class Charmap
 {
@@ -55,10 +78,49 @@ public:
 
         return it->second;
     }
+
+    bool isUpper(std::int32_t code)
+    {
+        if (std::isupper(code))
+            return true;
+
+        auto it = m_upper.find(code);
+
+        if (it == m_upper.end())
+            return false;
+
+        return it->second;
+    }
+
+    bool isSeparator(std::int32_t code)
+    {
+        if (code == U'\\')
+            return true;
+
+        auto it = m_separator.find(code);
+
+        if (it == m_separator.end())
+            return false;
+
+        return it->second;
+    }
+
+    bool isBigramException(std::int32_t lastCode, std::int32_t code)
+    {
+        if (!std::isalpha(lastCode))
+            return false;
+
+        return (
+            sBigramExceptions.find(lastCode) != sBigramExceptions.end()
+            && sBigramExceptions.find(lastCode)->second.count(code) > 0
+        );
+    }
 private:
     std::map<std::int32_t, std::string> m_chars;
     std::string m_escapes[128];
     std::map<std::string, std::string> m_constants;
+    std::map<std::int32_t, bool> m_upper;
+    std::map<std::int32_t, bool> m_separator;
 };
 
 #endif // CHARMAP_H

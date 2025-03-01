@@ -2596,13 +2596,6 @@ u32 BattleStringExpandPlaceholders(const u8 *src, u8 *dst)
                     toCpy = gLinkPlayers[0].name;
                 else
                     toCpy = gSaveBlock2Ptr->playerName;
-                #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
-                if (toCpy != text && *toCpy != CHAR_FIXED_CASE && !(*src & PLACEHOLDER_FIXED_MASK)) {
-                    *text = CHAR_FIXED_CASE;
-                    StringCopyN(text+1, toCpy, PLAYER_NAME_LENGTH + 1);
-                    toCpy = text;
-                }
-                #endif
                 break;
             case B_TXT_TRAINER1_LOSE_TEXT: // trainerA lose text
                 if (gBattleTypeFlags & BATTLE_TYPE_FRONTIER)
@@ -2738,25 +2731,6 @@ u32 BattleStringExpandPlaceholders(const u8 *src, u8 *dst)
                 break;
             }
 
-            #if DECAP_ENABLED
-            if (toCpy != NULL)
-            {
-                bool32 fixedCase = *src & PLACEHOLDER_FIXED_MASK;
-
-                if (fixedCase)
-                    dst[dstID++] = CHAR_FIXED_CASE;
-
-                while (*toCpy != EOS) {
-                    if (*toCpy == CHAR_FIXED_CASE)
-                        fixedCase = TRUE;
-                    else if (*toCpy == CHAR_UNFIX_CASE)
-                        fixedCase = FALSE;
-                    dst[dstID++] = *toCpy++;
-                }
-                if (fixedCase)
-                    dst[dstID++] = CHAR_UNFIX_CASE;
-            }
-            #else
             // missing if (toCpy != NULL) check
             while (*toCpy != EOS)
             {
@@ -2764,7 +2738,6 @@ u32 BattleStringExpandPlaceholders(const u8 *src, u8 *dst)
                 dstID++;
                 toCpy++;
             }
-            #endif
             if (*src == B_TXT_TRAINER1_LOSE_TEXT || *src == B_TXT_TRAINER2_LOSE_TEXT
                 || *src == B_TXT_TRAINER1_WIN_TEXT || *src == B_TXT_TRAINER2_WIN_TEXT)
             {

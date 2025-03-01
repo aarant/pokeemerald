@@ -1005,10 +1005,7 @@ static void PrintNameOnCardFront(void)
     u8 buffer[32];
     u8 *txtPtr;
     txtPtr = StringCopy(buffer, gText_TrainerCardName);
-    if (DECAP_ENABLED && !DECAP_NICKNAMES && DECAP_MIRRORING)
-        StringCopy(txtPtr, MirrorPtr(sData->trainerCard.playerName));
-    else
-        StringCopy(txtPtr, sData->trainerCard.playerName);
+    StringCopy(txtPtr, sData->trainerCard.playerName);
     ConvertInternationalString(txtPtr, sData->language);
     if (sData->cardType == CARD_TYPE_FRLG)
         AddTextPrinterParameterized3(WIN_CARD_TEXT, FONT_NORMAL, 20, 28, sTrainerCardTextColors, TEXT_SKIP_DRAW, buffer);
@@ -1166,10 +1163,7 @@ static void PrintProfilePhraseOnCard(void)
 
 static void BufferNameForCardBack(void)
 {
-    if (DECAP_ENABLED && !DECAP_NICKNAMES && DECAP_MIRRORING)
-        StringCopy(sData->textPlayersCard, MirrorPtr(sData->trainerCard.playerName));
-    else
-        StringCopy(sData->textPlayersCard, sData->trainerCard.playerName);
+    StringCopy(sData->textPlayersCard, sData->trainerCard.playerName);
     ConvertInternationalString(sData->textPlayersCard, sData->language);
     if (sData->cardType != CARD_TYPE_FRLG)
     {

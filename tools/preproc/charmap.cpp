@@ -21,6 +21,7 @@
 #include <cstdio>
 #include <cstdint>
 #include <cstdarg>
+#include <iostream>
 #include "preproc.h"
 #include "charmap.h"
 #include "char_util.h"
@@ -369,6 +370,29 @@ void CharmapReader::SkipWhitespace()
         m_pos++;
 }
 
+/** Map of characters to consider as uppercase, for better decapitalization. */
+const std::map<std::int32_t, bool> sIsUpper = {
+    // For POKéDEX, POKéMON, etc.
+    {U'é', true},
+    // For TRAINER'S, etc.
+    {U'’', true},
+    {U'\'', true},
+};
+
+/** Map of characters to consider as word-separators */
+const std::map<std::int32_t, bool> sIsSeparator = {
+    {U' ', true},
+    // Digits are separators for "TM01", etc.
+    {U'0', true}, {U'1', true}, {U'2', true}, {U'3', true}, {U'4', true},
+    {U'5', true}, {U'6', true}, {U'7', true}, {U'8', true}, {U'9', true},
+    {U'!', true}, {U'?', true}, {U'.', true}, {U'-', true},
+    {U'‘', true}, {U'’', true}, {U'\'', true}, {U'“', true}, {U'”', true},
+    {U',', true}, {U'/', true},
+    // for "TMs"
+    {U's', true},
+    {U'$', true},
+};
+
 Charmap::Charmap(std::string filename)
 {
     CharmapReader reader(filename);
@@ -390,6 +414,13 @@ Charmap::Charmap(std::string filename)
             if (m_chars.find(lhs.code) != m_chars.end())
                 reader.RaiseError("redefining char");
             m_chars[lhs.code] = sequence;
+
+            if (sIsUpper.find(lhs.code) != sIsUpper.end())
+                m_upper[lhs.code] = true;
+
+            if (sIsSeparator.find(lhs.code) != sIsSeparator.end())
+                m_separator[lhs.code] = true;
+
             break;
         case LhsType::Escape:
             if (m_escapes[lhs.code].length() != 0)

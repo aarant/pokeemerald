@@ -1,5 +1,11 @@
 #include "easy_chat.h"
 
+#if (DECAP_ENABLED) && !(DECAP_EASY_CHAT)
+#define _E(x) _C(x)
+#else
+#define _E(x) _(x)
+#endif
+
 #include "easy_chat_group_pokemon.h"
 #include "easy_chat_group_trainer.h"
 #include "easy_chat_group_status.h"

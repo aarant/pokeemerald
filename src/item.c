@@ -20,6 +20,12 @@ static bool8 CheckPyramidBagHasSpace(u16 itemId, u16 count);
 
 EWRAM_DATA struct BagPocket gBagPockets[POCKETS_COUNT] = {0};
 
+#if (DECAP_ENABLED) && !(DECAP_ITEMS)
+#define _I(x) _C(x)
+#else
+#define _I(x) _(x)
+#endif
+
 #include "data/text/item_descriptions.h"
 #include "data/items.h"
 
@@ -873,11 +879,7 @@ static u16 SanitizeItemId(u16 itemId)
 
 const u8 *ItemId_GetName(u16 itemId)
 {
-    #if (DECAP_ENABLED) && (DECAP_MIRRORING) && !(DECAP_ITEM_NAMES)
-    return ROM_MIRROR_PTR(gItems[SanitizeItemId(itemId)].name);
-    #else
     return gItems[SanitizeItemId(itemId)].name;
-    #endif
 }
 
 // Unused

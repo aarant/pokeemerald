@@ -73,6 +73,21 @@ std::string StringParser::ReadCharOrEscape()
     UnicodeChar unicodeChar = DecodeUtf8(&m_buffer[m_pos]);
     m_pos += unicodeChar.encodingLength;
     std::int32_t code = unicodeChar.code;
+    // If not fixed case, try to decap
+    if (!fixedCase &&
+        // Two consecutive uppercase chars; convert `code` to lowercase,
+        // unless word is a separated bigram in the bigram exceptions list
+        // (i.e, TM in " TM01")
+        g_charmap->isUpper(code) &&
+        g_charmap->isUpper(lastChar.code) &&
+        // check if separated bigram
+        !((g_charmap->isSeparator(nextLastChar.code) || nextLastChar.isEscape) &&
+          // try to decode next sequence
+          g_charmap->isSeparator(DecodeUtf8(&m_buffer[m_pos]).code) &&
+          g_charmap->isBigramException(lastChar.code, code))
+    ) {
+        code = std::tolower(code);
+    }
 
     if (code == -1)
         RaiseError("invalid encoding in UTF-8 string");
@@ -89,6 +104,12 @@ std::string StringParser::ReadCharOrEscape()
         else
             RaiseError("unknown character U+%X", code);
     }
+
+    // track last chars and whether it was an escape sequence;
+    // escape sequences ('\n') are always considered word-separators
+    nextLastChar = lastChar;
+    lastChar = unicodeChar;
+    lastChar.isEscape = isEscape;
 
     return sequence;
 }
@@ -162,13 +183,28 @@ std::string StringParser::ReadBracketedConstants()
 
     m_pos++; // Go past the right curly bracket.
 
+    lastChar = DecodeUtf8(" "); // constants are always considered separators
+
+    // fix or unfix string case, and output a zero-length sequence
+    if (totalSequence.length() == 1
+        && (totalSequence[0] == '\x7D' // FIXED_CASE
+            || totalSequence[0] == '\x7E' // UNFIX_CASE
+        )
+    ) {
+        fixedCase = totalSequence[0] != '\x7E';
+        return std::string();
+    }
+
     return totalSequence;
 }
 
 // Reads a charmap string.
-int StringParser::ParseString(long srcPos, unsigned char* dest, int& destLength)
+int StringParser::ParseString(long srcPos, unsigned char* dest, int& destLength, bool initFixedCase)
 {
     m_pos = srcPos;
+    lastChar = DecodeUtf8(" ");
+    nextLastChar = DecodeUtf8(" ");
+    fixedCase = initFixedCase;
 
     if (m_buffer[m_pos] != '"')
         RaiseError("expected UTF-8 string literal");

@@ -46,7 +46,7 @@ public:
     Directive GetDirective();
     std::string GetGlobalLabel();
     std::string ReadPath();
-    int ReadString(unsigned char* s);
+    int ReadString(unsigned char* s, bool initFixedCase);
     int ReadBraille(unsigned char* s);
     bool IsAtEnd();
     void OutputLine();

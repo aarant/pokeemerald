@@ -27,6 +27,7 @@ struct UnicodeChar
 {
     std::int32_t code;
     int encodingLength;
+    bool isEscape;
 };
 
 UnicodeChar DecodeUtf8(const char* s);

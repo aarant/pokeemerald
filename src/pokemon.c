@@ -3780,14 +3780,6 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
         {
             i = POKEMON_NAME_LENGTH;
 
-            #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
-            if (boxMon->nickname[i - 1] == EOS) {
-                *data++ = CHAR_FIXED_CASE;
-                i--;
-            } else if (IsStringAddrSafe(data, POKEMON_NAME_LENGTH))
-                *data++ = CHAR_FIXED_CASE;
-            #endif
-
             for (retVal = 0; retVal < i; retVal++)
                 data[retVal] = boxMon->nickname[retVal];
 
@@ -3810,15 +3802,6 @@ u32 GetBoxMonData3(struct BoxPokemon *boxMon, s32 field, u8 *data)
     case MON_DATA_OT_NAME:
     {
         i = PLAYER_NAME_LENGTH;
-
-        #if (DECAP_ENABLED) && !(DECAP_NICKNAMES)
-         // prepend fixed-case and copy 1 less character
-        if (boxMon->otName[i - 1] == EOS) {
-            *data++ = CHAR_FIXED_CASE;
-            i--;
-        } else if (IsStringAddrSafe(data, PLAYER_NAME_LENGTH))
-            *data++ = CHAR_FIXED_CASE;
-        #endif
 
         for (retVal = 0; retVal < i; retVal++)
             data[retVal] = boxMon->otName[retVal];

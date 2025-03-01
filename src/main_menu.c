@@ -162,10 +162,6 @@
  *  - Destroys itself when done.
  */
 
-#if (DECAP_ENABLED) && (DECAP_MIRRORING) && !(DECAP_MAIN_MENU)
-#define AddTextPrinterParameterized3(a, b, c, d, e, f, str) AddTextPrinterParameterized3(a, b, c, d, e, f, MirrorPtr(str))
-#endif
-
 
 #define OPTION_MENU_FLAG (1 << 15)
 
@@ -2144,11 +2140,7 @@ static void MainMenu_FormatSavegamePlayer(void)
 {
     StringExpandPlaceholders(gStringVar4, gText_ContinueMenuPlayer);
     AddTextPrinterParameterized3(2, FONT_NORMAL, 0, 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gStringVar4);
-    #if (DECAP_ENABLED) && (DECAP_MIRRORING) && !(DECAP_NICKNAMES)
-    AddTextPrinterParameterized3(2, FONT_NORMAL, GetStringRightAlignXOffset(FONT_NORMAL, gSaveBlock2Ptr->playerName, 100), 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, MirrorPtr(gSaveBlock2Ptr->playerName));
-    #else
     AddTextPrinterParameterized3(2, FONT_NORMAL, GetStringRightAlignXOffset(FONT_NORMAL, gSaveBlock2Ptr->playerName, 100), 17, sTextColor_MenuInfo, TEXT_SKIP_DRAW, gSaveBlock2Ptr->playerName);
-    #endif
 }
 
 static void MainMenu_FormatSavegameTime(void)

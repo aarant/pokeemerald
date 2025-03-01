@@ -241,30 +241,6 @@ static void SetFontsPointer(const struct FontInfo *fonts)
     gFonts = fonts;
 }
 
-#if (DECAP_ENABLED) && (DECAP_MIRRORING)
-void * MirrorPtr(const void *ptr) {
-    if (((u32)ptr) >> 27) // ROM
-        return ROM_MIRROR_PTR(ptr);
-    else // RAM
-        return RAM_MIRROR_PTR(ptr);
-}
-
-void * UnmirrorPtr(const void *ptr) {
-    u32 value = (u32) ptr;
-    if (value >> 27) // ROM
-        return (void*)(value & ~ROM_MIRROR_MASK);
-    else // RAM
-        return (void*)(value & ~RAM_MIRROR_MASK);
-}
-
-bool32 IsMirrorPtr(const void *ptr) {
-    if (((u32)ptr) >> 27)
-        return ((u32)ptr) & ROM_MIRROR_MASK;
-    else
-        return ((u32)ptr) & RAM_MIRROR_MASK;
-}
-#endif
-
 void DeactivateAllTextPrinters(void)
 {
     int printer;
@@ -292,12 +268,6 @@ u16 AddTextPrinterParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 
     return AddTextPrinter(&printerTemplate, speed, callback);
 }
 
-#if (DECAP_ENABLED) && (DECAP_MIRRORING)
-u16 AddTextPrinterFixedCaseParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 y, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16)) {
-    return AddTextPrinterParameterized(windowId, fontId, MirrorPtr(str), x, y, speed, callback);
-}
-#endif
-
 bool16 AddTextPrinter(struct TextPrinterTemplate *printerTemplate, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16))
 {
     int i;
@@ -311,20 +281,6 @@ bool16 AddTextPrinter(struct TextPrinterTemplate *printerTemplate, u8 speed, voi
     sTempTextPrinter.textSpeed = speed;
     sTempTextPrinter.delayCounter = 0;
     sTempTextPrinter.scrollDistance = 0;
-    #if DECAP_ENABLED
-    #if DECAP_MIRRORING
-    // string address is mirrored; treat it as a fixed-case string
-    if (IsMirrorPtr(printerTemplate->currentChar)) {
-        sTempTextPrinter.lastChar = CHAR_FIXED_CASE;
-        // Techhnically, unmirroring isn't necessary;
-        // but older emulators may not support mirroring
-        // printerTemplate->currentChar = UnmirrorPtr(printerTemplate->currentChar);
-    }
-    else
-    #endif
-        sTempTextPrinter.lastChar = 0;
-    sTempTextPrinter.nextLastChar = 0;
-    #endif
 
     for (i = 0; i < (int)ARRAY_COUNT(sTempTextPrinter.subStructFields); i++)
         sTempTextPrinter.subStructFields[i] = 0;
@@ -975,74 +931,10 @@ void DrawDownArrow(u8 windowId, u16 x, u16 y, u8 bgColor, bool8 drawArrow, u8 *c
     }
 }
 
-#if DECAP_ENABLED
-// (Char)acter (Attr)ibute table
-// if table[char] & 0xFF == 0, character is not uppercase
-// For uppercase characters, lower 8 bits are the diff
-// between a char and its lowercase equivalent
-const u16 gCharAttrTable[] = {
-    // English
-    [CHAR_SPACE]                            = BIGRAM_SEP_FLAG,
-    [CHAR_SPACER]                           = BIGRAM_SEP_FLAG,
-    // Digits are bigram separators for "TM01", etc.
-    // 0-9, !, ?, ., -
-    [CHAR_0 ... CHAR_HYPHEN]                = BIGRAM_SEP_FLAG,
-    [CHAR_A ... CHAR_Z]                     = CHAR_a - CHAR_A,
-    // é and ’ treated as uppercase so POKéDEX, POKéMON, etc. decap
-    [CHAR_e_ACUTE]                          = UPPERCASE_FLAG,
-    [CHAR_SGL_QUOTE_RIGHT]                  = UPPERCASE_FLAG | BIGRAM_SEP_FLAG,
-    [CHAR_SGL_QUOTE_LEFT]                   = BIGRAM_SEP_FLAG,
-    [CHAR_DBL_QUOTE_LEFT]                   = BIGRAM_SEP_FLAG,
-    [CHAR_DBL_QUOTE_RIGHT]                  = BIGRAM_SEP_FLAG,
-    [CHAR_COMMA]                            = BIGRAM_SEP_FLAG,
-    [CHAR_SLASH]                            = BIGRAM_SEP_FLAG,
-    // For'TMs'
-    [CHAR_s]                                = BIGRAM_SEP_FLAG,
-    // International
-    [CHAR_A_GRAVE ... CHAR_A_ACUTE]         = CHAR_a_GRAVE - CHAR_A_GRAVE,
-    [CHAR_A_CIRCUMFLEX]                     = CHAR_a_CIRCUMFLEX,
-    [CHAR_C_CEDILLA ... CHAR_I_GRAVE]       = CHAR_c_CEDILLA - CHAR_C_CEDILLA,
-    [CHAR_I_ACUTE]                          = CHAR_i_ACUTE,
-    [CHAR_I_CIRCUMFLEX ... CHAR_N_TILDE]    = CHAR_i_CIRCUMFLEX - CHAR_I_CIRCUMFLEX,
-    [CHAR_A_DIAERESIS ... CHAR_U_DIAERESIS] = CHAR_a_DIAERESIS - CHAR_A_DIAERESIS,
-    // Ctrl chars
-    [CHAR_PROMPT_SCROLL ... EOS]            = BIGRAM_SEP_FLAG,
-};
-
-#define CHAR_TUPLE(x0, x1, x2, x3) (CHAR_##x0 | (CHAR_##x1 << 8) | (CHAR_##x2 << 16) | (CHAR_##x3 << 24))
-#define ALPHA_IDX(x) (CHAR_##x - CHAR_A)
-
-// Checks if word has a zero byte
-// See https://graphics.stanford.edu/~seander/bithacks.html#ValueInWord
-#define HAS_ZEROB(word) (((word) - 0x01010101UL) & ~(word) & 0x80808080UL)
-#define HAS_BYTE(word, byte) (HAS_ZEROB((word) ^ (~0UL/255 * (byte))))
-
-// List of bigram exceptions whose case should be preserved
-// i.e, if 'TV' is surrounded by BIGRAM_SEP chars, don't decap!
-static const u32 sBigramExceptions[CHAR_Z - CHAR_A] = {
-    [ALPHA_IDX(A)] = CHAR_TUPLE(I, _, _, _), // AI
-    [ALPHA_IDX(B)] = CHAR_TUPLE(P, _, _, _), // BP
-    [ALPHA_IDX(H)] = CHAR_TUPLE(M, P, _, _), // HM, HP
-    [ALPHA_IDX(I)] = CHAR_TUPLE(D, _, _, _), // ID
-    [ALPHA_IDX(K)] = CHAR_TUPLE(O, _, _, _), // KO
-    [ALPHA_IDX(L)] = CHAR_TUPLE(R, _, _, _), // LR
-    [ALPHA_IDX(M)] = CHAR_TUPLE(B, C, _, _), // MB, MC
-    [ALPHA_IDX(O)] = CHAR_TUPLE(T, _, _, _), // OT
-    [ALPHA_IDX(P)] = CHAR_TUPLE(C, P, _, _), // PC, PP
-    [ALPHA_IDX(T)] = CHAR_TUPLE(M, V, _, _), // TM, TV
-    [ALPHA_IDX(U)] = CHAR_TUPLE(V, _, _, _), // UV
-    [ALPHA_IDX(X)] = CHAR_TUPLE(L, S, _, _), // XL, XS
-};
-#endif
-
 static u16 RenderText(struct TextPrinter *textPrinter)
 {
     struct TextPrinterSubStruct *subStruct = (struct TextPrinterSubStruct *)(&textPrinter->subStructFields);
     u32 currChar;
-    #if DECAP_ENABLED
-    u32 lastChar;
-    u32 nextLastChar;
-    #endif
     s32 width;
     s32 widthHelper;
 
@@ -1070,14 +962,6 @@ static u16 RenderText(struct TextPrinter *textPrinter)
 
         currChar = *textPrinter->printerTemplate.currentChar;
         textPrinter->printerTemplate.currentChar++;
-        #if DECAP_ENABLED
-        lastChar = textPrinter->lastChar;
-        nextLastChar = textPrinter->nextLastChar;
-        if (lastChar != CHAR_FIXED_CASE) {
-            textPrinter->nextLastChar = textPrinter->lastChar;
-            textPrinter->lastChar = currChar;
-        }
-        #endif
 
         switch (currChar)
         {
@@ -1233,44 +1117,8 @@ static u16 RenderText(struct TextPrinter *textPrinter)
             textPrinter->printerTemplate.currentX += gCurGlyph.width + textPrinter->printerTemplate.letterSpacing;
             return RENDER_PRINT;
         case EOS:
-        #if DECAP_ENABLED
-            // Clear fixed case
-            textPrinter->nextLastChar = textPrinter->lastChar = currChar;
-            return RENDER_FINISH;
-        // Disable/enable decapitalization
-        // In vanilla these are 1-2 pixel spaces
-        case CHAR_FIXED_CASE:
-        case CHAR_UNFIX_CASE:
-            textPrinter->lastChar = currChar;
-        // fallthrough
-        case ZW_SPACE: // zero-width when decap enabled
-            if (!textPrinter->japanese)
-                return RENDER_REPEAT;
-            break;
-        }
-
-        // If not Japanese or fixed case, try to decap
-        if (!textPrinter->japanese && lastChar != CHAR_FIXED_CASE) {
-            // Two consecutive uppercase chars; lowercase `currChar`
-            // unless word is a separated bigram in sBigramExceptions
-            // (i.e, TM in " TM01")
-            if (IS_UPPER(currChar) &&
-                IS_UPPER(lastChar) &&
-                // check if separated bigram
-                !(lastChar >= CHAR_A &&
-                  IS_BIGRAM_SEP(nextLastChar) &&
-                  IS_BIGRAM_SEP(*textPrinter->printerTemplate.currentChar) &&
-                  HAS_BYTE(sBigramExceptions[lastChar - CHAR_A], currChar)
-                 )
-               )
-            {
-                currChar = TO_LOWER(currChar);
-            }
-        }
-        #else
             return RENDER_FINISH;
         }
-        #endif
 
         switch (subStruct->fontId)
         {
