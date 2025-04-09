@@ -1,0 +1,26 @@
+From 6a12e3f65991aa8dd22f4933aacb5e45bdd230d5 Mon Sep 17 00:00:00 2001
+From: Ariel A <24759293+aarant@users.noreply.github.com>
+Date: Tue, 8 Apr 2025 22:01:50 -0400
+Subject: [PATCH] fix: load 6 mon icon palettes, not 3
+
+---
+ payload/src/all.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/payload/src/all.c b/payload/src/all.c
+index 20f9a89..5a5ed6d 100644
+--- a/payload/src/all.c
++++ b/payload/src/all.c
+@@ -961,7 +961,8 @@ void sub_020017E8(struct Unk02021860Struct *a0)
+     sub_2002E70(gUnknown_02021860.unk118);
+     gBgTilemapBufferTransferScheduled[1] = TRUE;
+     monIconPalettes = gAgbPmRomParams->monIconPalettes;
+-    DmaCopy16(3, monIconPalettes[0].data, (void *) PLTT + 0x200, 0x60);
++    // Load 6 icons, not 3
++    DmaCopy16(3, monIconPalettes[0].data, (void *) PLTT + 0x200, 0x20 * 6);
+     AutoUnCompVram(gPartySlots_Tilemap, (void *) VRAM + 0x14000);
+     if (a0->unk11A == 0)
+         coords = gUnknown_0201F9BC;
+-- 
+2.48.1
+

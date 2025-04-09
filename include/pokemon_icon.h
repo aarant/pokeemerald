@@ -4,6 +4,7 @@
 extern const u8 gMonIconPaletteIndices[];
 extern const u8 *const gMonIconTable[];
 extern const struct SpritePalette gMonIconPaletteTable[];
+extern const struct SpritePalette gMonIconIwramPaletteTable[];
 
 const u8 *GetMonIconTiles(u16 species, bool32);
 void TryLoadAllMonIconPalettesAtOffset(u16 offset);
@@ -23,5 +24,6 @@ u8 UpdateMonIconFrame(struct Sprite *sprite);
 void SpriteCB_MonIcon(struct Sprite *sprite);
 void SetPartyHPBarSprite(struct Sprite *sprite, u8 animNum);
 u8 GetMonIconPaletteIndexFromSpecies(u16 species);
+void LoadSavedPartyIconGfxIwram(void);
 
 #endif // GUARD_POKEMON_ICON_H

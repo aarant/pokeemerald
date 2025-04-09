@@ -1,5 +1,6 @@
 #include "global.h"
 #include "data.h"
+#include "decompress.h"
 #include "graphics.h"
 #include "mail.h"
 #include "palette.h"
@@ -922,6 +923,18 @@ const struct SpritePalette gMonIconPaletteTable[] =
     { gMonIconPalettes[5 % 3], POKE_ICON_BASE_PAL_TAG + 5 },
 };
 
+#define MON_ICON_IWRAM_PAL_NUM(x) ((const u16*)(MON_ICON_PALETTE_IWRAM_START + (x) * PLTT_SIZE_4BPP))
+
+const struct SpritePalette gMonIconIwramPaletteTable[] =
+{
+    { MON_ICON_IWRAM_PAL_NUM(0), POKE_ICON_BASE_PAL_TAG + 0 },
+    { MON_ICON_IWRAM_PAL_NUM(1), POKE_ICON_BASE_PAL_TAG + 1 },
+    { MON_ICON_IWRAM_PAL_NUM(2), POKE_ICON_BASE_PAL_TAG + 2 },
+    { MON_ICON_IWRAM_PAL_NUM(3), POKE_ICON_BASE_PAL_TAG + 3 },
+    { MON_ICON_IWRAM_PAL_NUM(4), POKE_ICON_BASE_PAL_TAG + 4 },
+    { MON_ICON_IWRAM_PAL_NUM(5), POKE_ICON_BASE_PAL_TAG + 5 },
+};
+
 static const struct OamData sMonIconOamData =
 {
     .y = 0,
@@ -1300,4 +1313,29 @@ void SetPartyHPBarSprite(struct Sprite *sprite, u8 animNum)
     sprite->animNum = animNum;
     sprite->animDelayCounter = 0;
     sprite->animCmdIndex = 0;
+}
+
+// Load saved party's mon icon palettes into IWRAM
+// (Allowing Colosseum/XD multiboot to display them properly)
+void LoadSavedPartyIconGfxIwram(void) {
+    u32 i;
+    // Fill with an invalid index, to make errors visible
+    CpuFastFill8(ARRAY_COUNT(gMonIconIwramPaletteTable), (void*)MON_ICON_INDICES_IWRAM_START, NUM_SPECIES);
+    for (i = 0; i < PARTY_SIZE; i++) {
+        u16 species = GetMonData2(&gSaveBlock1Ptr->playerParty[i], MON_DATA_SPECIES_OR_EGG);
+        const u32 *paletteData = GetMonFrontSpritePal(&gSaveBlock1Ptr->playerParty[i]);
+        if (!species)
+            continue;
+
+        // Failsafe decompression
+        // This can use any buffer that is at least (PLTT_SIZE_4BPP * NUM_CASTFORM_FORMS) bytes
+        if (IsLZ77Data(paletteData, PLTT_SIZE_4BPP, PLTT_SIZE_4BPP * 4)) {
+            LZDecompressWram(paletteData, gPaletteDecompressionBuffer);
+            paletteData = (u32*) gPaletteDecompressionBuffer;
+        }
+
+        // Load into i-th slot and set species index
+        CpuFastCopy(paletteData, (u16*)MON_ICON_IWRAM_PAL_NUM(i), PLTT_SIZE_4BPP);
+        ((u8*)MON_ICON_INDICES_IWRAM_START)[species] = i;
+    }
 }

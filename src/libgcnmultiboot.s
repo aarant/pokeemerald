@@ -255,6 +255,9 @@ GameCubeMultiBoot_ExecuteProgram:
 	ldr r3, pool_InterruptRegs
 	movs r1, 0
 	strh r1, [r3, OFFSET_REG_IME - 0x200]
+	@ Move stack below the IWRAM mon icon palettes
+	ldr r1, pool_MultiBootSP
+	mov sp, r1
 	@ Jump to the real entry point of the multiboot image (past the image header), in ARM mode
 	ldr r1, pool_MultiBootLoadAddr
 	adds r1, 0xC0
@@ -637,5 +640,7 @@ pool_RegDispstat: .4byte REG_DISPSTAT
 pool_RubyUSAGameCode: .ascii "AXVE"
 
 pool_MultiBootLoadAddr: .4byte EWRAM_START
+
+pool_MultiBootSP: .4byte IWRAM_START + 0x7900 @ MON_ICON_PALETTE_IWRAM_START
 
 	.align 2, 0 @ Don't pad with nop.

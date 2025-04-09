@@ -22,6 +22,12 @@
 #define TRAINER_PIC_HEIGHT 64
 #define TRAINER_PIC_SIZE (TRAINER_PIC_WIDTH * TRAINER_PIC_HEIGHT / 2)
 
+// 0x7900 chosen to allow 6 palettes @ 32 bytes = 192 bytes,
+// + ~1024 entry palette index array before the stack tip (0x03007E40, see crt0.s)
+// See also the duplicate entry in libgcnmultiboot.s
+#define MON_ICON_PALETTE_IWRAM_START (IWRAM_START + 0x7900)
+#define MON_ICON_INDICES_IWRAM_START (IWRAM_START + 0x79C0)
+
 // Red and Leaf's back pics have 5 frames, but this is presumably irrelevant in the places this is used.
 #define MAX_TRAINER_PIC_FRAMES 4
 
