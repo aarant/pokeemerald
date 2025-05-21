@@ -41,7 +41,7 @@ const std::map<std::int32_t, std::set<std::int32_t>> sBigramExceptions = {
     {'K', {'O'}},
     {'L', {'R'}},
     {'M', {'B', 'C'}}, // (M)ega (B)ytes, (M)aster of (C)eremonies
-    {'O', {'T'}}, // (O)riginal (T)rainer
+    {'O', {'K', 'T'}}, // OK, (O)riginal (T)rainer
     {'P', {'C', 'P'}}, // PC, PP
     {'T', {'M', 'V'}}, // TM, TV
     {'U', {'V'}}, // (U)ltra (V)iolet?

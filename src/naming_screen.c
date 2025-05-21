@@ -279,22 +279,22 @@ static const struct WindowTemplate sWindowTemplates[WIN_COUNT + 1] =
 // The keys shown on the keyboard are handled separately by sNamingScreenKeyboardText
 static const u8 sKeyboardChars[KBPAGE_COUNT][KBROW_COUNT][KBCOL_COUNT] = {
     [KEYBOARD_LETTERS_LOWER] = {
-        __("abcdef ."),
-        __("ghijkl ,"),
-        __("mnopqrs "),
-        __("tuvwxyz "),
+        __C("abcdef ."),
+        __C("ghijkl ,"),
+        __C("mnopqrs "),
+        __C("tuvwxyz "),
     },
     [KEYBOARD_LETTERS_UPPER] = {
-        __("ABCDEF ."),
-        __("GHIJKL ,"),
-        __("MNOPQRS "),
-        __("TUVWXYZ "),
+        __C("ABCDEF ."),
+        __C("GHIJKL ,"),
+        __C("MNOPQRS "),
+        __C("TUVWXYZ "),
     },
     [KEYBOARD_SYMBOLS] = {
-        __("01234   "),
-        __("56789   "),
-        __("!?♂♀/-  "),
-        __("…“”‘'   "),
+        __C("01234   "),
+        __C("56789   "),
+        __C("!?♂♀/-  "),
+        __C("…“”‘'   "),
     }
 };
 
