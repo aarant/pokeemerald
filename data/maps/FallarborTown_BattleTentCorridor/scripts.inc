@@ -52,7 +52,7 @@ FallarborTown_ContestHall_Text_MonAllTheseRibbons:
 	.string "See!\n"
 	.string "My POKéMON won all these RIBBONS!\p"
 	.string "Have your POKéMON earned any RIBBONS?\n"
-	.string "You can check them on your POKéNAV.$"
+	.string "You can check them on your POKé{}NAV.$"
 
 @ Unused
 FallarborTown_ContestHall_Text_CantWinEverywhere:
@@ -65,4 +65,3 @@ FallarborTown_ContestHall_Text_CantWinEverywhere:
 FallarborTown_ContestHall_Text_SuperRankStage:
 	.string "POKéMON CONTESTS\n"
 	.string "SUPER RANK STAGE!$"
-

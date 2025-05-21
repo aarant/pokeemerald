@@ -78,7 +78,7 @@ MtPyre_3F_Text_GabriellePostBattle:
 MtPyre_3F_Text_GabrielleRegister:
 	.string "I would like to see your POKéMON\n"
 	.string "when they grow up some more…\p"
-	.string "Please, I need to see your POKéNAV.$"
+	.string "Please, I need to see your POKé{}NAV.$"
 
 MtPyre_3F_Text_GabrielleRematchIntro:
 	.string "Oh, it's you…\p"
@@ -96,4 +96,3 @@ MtPyre_3F_Text_GabriellePostRematch:
 	.string "in the future…\p"
 	.string "They are all to be equally cherished.\n"
 	.string "I see that you've remembered that.$"
-
