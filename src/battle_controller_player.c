@@ -2213,7 +2213,7 @@ static bool8 ShouldDoSlideInAnim(void) {
     )
         return FALSE;
 
-    if (GetFirstLiveMon() != &gPlayerParty[gBattlerPartyIndexes[gActiveBattler]])
+    if (GetFirstLiveFollowMon() != &gPlayerParty[gBattlerPartyIndexes[gActiveBattler]])
         return FALSE;
 
     return TRUE;
