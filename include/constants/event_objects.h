@@ -326,7 +326,7 @@
 // These accept vars, too: VAR_TEMP_1, etc
 #define OW_MON_ALLOWED_SPECIES (0)
 #define OW_MON_ALLOWED_MET_LVL (0)
-#define OW_MON_ALLOWED_MET_LOC (0)
+#define OW_MON_ALLOWED_MET_LOC (MAPSEC_COUNT)
 // Examples:
 // Yellow Pikachu:
 // #define OW_MON_ALLOWED_SPECIES (SPECIES_PIKACHU)
@@ -339,7 +339,7 @@
 // Species set in VAR_XXXX:
 // #define OW_MON_ALLOWED_SPECIES (VAR_XXXX)
 // #define OW_MON_ALLOWED_MET_LVL (0)
-// #define OW_MON_ALLOWED_MET_LOC (0)
+// #define OW_MON_ALLOWED_MET_LOC (MAPSEC_COUNT)
 
 #define SHADOW_SIZE_S   0
 #define SHADOW_SIZE_M   1
