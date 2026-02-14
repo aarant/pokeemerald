@@ -8,7 +8,6 @@
 #include "load_save.h"
 #include "overworld.h"
 #include "pokemon_storage_system.h"
-#include "main.h"
 #include "string_util.h"
 #include "text.h"
 #include "trainer_hill.h"
@@ -90,7 +89,7 @@ COMMON_DATA struct SaveSector *gReadWriteSector = NULL; // Pointer to a buffer f
 COMMON_DATA u16 gIncrementalSectorId = 0;
 COMMON_DATA u16 gSaveUnusedVar = 0;
 COMMON_DATA u16 gSaveFileStatus = 0;
-COMMON_DATA void (*gGameContinueCallback)(void) = NULL;
+COMMON_DATA MainCallback gGameContinueCallback = NULL;
 COMMON_DATA struct SaveSectorLocation gRamSaveSectorLocations[NUM_SECTORS_PER_SLOT] = {0};
 COMMON_DATA u16 gSaveUnusedVar2 = 0;
 COMMON_DATA u16 gSaveAttemptStatus = 0;
@@ -892,7 +891,7 @@ u8 LoadGameSave(u8 saveType)
         CopyPartyAndObjectsFromSave();
 
         gSaveFileStatus = status;
-        gGameContinueCallback = 0;
+        gGameContinueCallback = NULL;
         break;
     case SAVE_HALL_OF_FAME:
         status = TryLoadSaveSector(SECTOR_ID_HOF_1, gDecompressionBuffer, SECTOR_DATA_SIZE);

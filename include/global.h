@@ -5,6 +5,7 @@
 #include <limits.h>
 #include "config.h" // we need to define config before gba headers as print stuff needs the functions nulled before defines.
 #include "gba/gba.h"
+#include "gametypes.h"
 #include "constants/global.h"
 #include "constants/flags.h"
 #include "constants/vars.h"
@@ -121,6 +122,9 @@
 #define T2_READ_16(ptr) ((ptr)[0] + ((ptr)[1] << 8))
 #define T2_READ_32(ptr) ((ptr)[0] + ((ptr)[1] << 8) + ((ptr)[2] << 16) + ((ptr)[3] << 24))
 #define T2_READ_PTR(ptr) (void *) T2_READ_32(ptr)
+
+#define PACK(data, shift, mask)   ( ((data) << (shift)) & (mask) )
+#define UNPACK(data, shift, mask) ( ((data) & (mask)) >> (shift) )
 
 // Macros for checking the joypad
 #define TEST_BUTTON(field, button) ((field) & (button))

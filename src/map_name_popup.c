@@ -339,7 +339,7 @@ static void ShowMapNamePopUpWindow(void)
     u8 x;
     const u8 *mapDisplayHeaderSource;
 
-    if (InBattlePyramid())
+    if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_TOP)
         {
@@ -404,7 +404,7 @@ static void LoadMapNamePopUpWindowBg(void)
 {
     u8 popUpThemeId;
     u8 popupWindowId = GetMapNamePopUpWindowId();
-    u16 regionMapSectionId = gMapHeader.regionMapSectionId;
+    mapsec_u16_t regionMapSectionId = gMapHeader.regionMapSectionId;
 
     if (regionMapSectionId >= KANTO_MAPSEC_START)
     {
