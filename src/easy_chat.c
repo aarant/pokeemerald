@@ -5224,7 +5224,19 @@ u8 *CopyEasyChatWord(u8 *dest, u16 easyChatWord)
     {
         u16 index = EC_INDEX(easyChatWord);
         u8 groupId = EC_GROUP(easyChatWord);
+        #if (DECAP_ENABLED) && (!DECAP_EASY_CHAT)
+        if (groupId == EC_GROUP_POKEMON
+            || groupId == EC_GROUP_POKEMON_NATIONAL
+            || groupId == EC_GROUP_MOVE_1
+            || groupId == EC_GROUP_MOVE_2
+        ) {
+            resultStr = StringToUppercaseN(dest, GetEasyChatWord(groupId, index), 0xFF);
+        } else {
+            resultStr = StringCopy(dest, GetEasyChatWord(groupId, index));
+        }
+        #else
         resultStr = StringCopy(dest, GetEasyChatWord(groupId, index));
+        #endif
     }
     else
     {

@@ -803,3 +803,65 @@ void StripExtCtrlCodes(u8 *str)
     }
     str[destIndex] = EOS;
 }
+
+// Uppercase characters in string
+u8 *StringToUppercaseN(u8 *dest, const u8 *src, u32 n) {
+    u32 i;
+    u32 language = GAME_LANGUAGE;
+
+    for (i = 0; *src != EOS && i < n;) {
+        u8 c = *src++;
+        i++;
+
+        switch (c)
+        {
+        case PLACEHOLDER_BEGIN:
+            *dest++ = c;
+            *dest++ = *src++;
+            i++;
+            break;
+        case EXT_CTRL_CODE_BEGIN:
+            *dest++ = c;
+            c = *src++;
+            *dest++ = c;
+            i++;
+
+            switch (c)
+            {
+            case EXT_CTRL_CODE_RESET_FONT:
+            case EXT_CTRL_CODE_PAUSE_UNTIL_PRESS:
+            case EXT_CTRL_CODE_FILL_WINDOW:
+            case EXT_CTRL_CODE_PAUSE_MUSIC:
+            case EXT_CTRL_CODE_RESUME_MUSIC:
+                break;
+            case EXT_CTRL_CODE_JPN:
+                language = LANGUAGE_JAPANESE;
+                break;
+            case EXT_CTRL_CODE_ENG:
+                language = LANGUAGE_ENGLISH;
+                break;
+            default:
+                *dest++ = *src++;
+                i++;
+            }
+            break;
+        case EOS:
+            *dest = EOS;
+            return dest;
+        // characters with case shared between languages
+        case CHAR_a ... CHAR_z:
+        case CHAR_a_DIAERESIS ... CHAR_u_DIAERESIS:
+            *dest++ = TO_UPPER(c);
+            break;
+        // if not Japanese, uppercase
+        default:
+            if (language != LANGUAGE_JAPANESE)
+                *dest++ = TO_UPPER(c);
+            else
+                *dest++ = c;
+        }
+    }
+
+    *dest = EOS;
+    return dest;
+}

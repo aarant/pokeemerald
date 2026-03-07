@@ -931,6 +931,61 @@ void DrawDownArrow(u8 windowId, u16 x, u16 y, u8 bgColor, bool8 drawArrow, u8 *c
     }
 }
 
+#define CHAR_DIFF_ENTRY(x, z) [CHAR_ ## x] = (CHAR_ ## z - CHAR_ ## x)
+#define CHAR_DIFF_RANGE(x, y, z) [CHAR_ ## x ... CHAR_ ## y] = (CHAR_ ## z - CHAR_ ## x)
+
+// (Char)acter (Attr)ibute table
+// if table[char] & 0xFF == 0, character is not uppercase
+// For uppercase characters, lower 8 bits are the diff
+// between a char and its lowercase equivalent
+const u16 gCharAttrTable[] = {
+    // English
+    [CHAR_SPACE]                            = BIGRAM_SEP_FLAG,
+    [CHAR_SPACER]                           = BIGRAM_SEP_FLAG,
+    // Digits are bigram separators for "TM01", etc.
+    // 0-9, !, ?, ., -
+    [CHAR_0 ... CHAR_HYPHEN]                = BIGRAM_SEP_FLAG,
+    [CHAR_A ... CHAR_Z]                     = CHAR_a - CHAR_A,
+    // é and ’ treated as uppercase so POKéDEX, POKéMON, etc. decap
+    [CHAR_e_ACUTE]                          = UPPERCASE_FLAG,
+    [CHAR_SGL_QUOTE_RIGHT]                  = UPPERCASE_FLAG | BIGRAM_SEP_FLAG,
+    [CHAR_SGL_QUOTE_LEFT]                   = BIGRAM_SEP_FLAG,
+    [CHAR_DBL_QUOTE_LEFT]                   = BIGRAM_SEP_FLAG,
+    [CHAR_DBL_QUOTE_RIGHT]                  = BIGRAM_SEP_FLAG,
+    [CHAR_COMMA]                            = BIGRAM_SEP_FLAG,
+    [CHAR_SLASH]                            = BIGRAM_SEP_FLAG,
+    // For'TMs'
+    [CHAR_s]                                = BIGRAM_SEP_FLAG,
+    // International
+    [CHAR_A_GRAVE ... CHAR_A_ACUTE]         = CHAR_a_GRAVE - CHAR_A_GRAVE,
+    [CHAR_A_CIRCUMFLEX]                     = CHAR_a_CIRCUMFLEX,
+    [CHAR_C_CEDILLA ... CHAR_I_GRAVE]       = CHAR_c_CEDILLA - CHAR_C_CEDILLA,
+    [CHAR_I_ACUTE]                          = CHAR_i_ACUTE - CHAR_I_ACUTE,
+    [CHAR_I_CIRCUMFLEX ... CHAR_N_TILDE]    = CHAR_i_CIRCUMFLEX - CHAR_I_CIRCUMFLEX,
+    [CHAR_A_DIAERESIS ... CHAR_U_DIAERESIS] = CHAR_a_DIAERESIS - CHAR_A_DIAERESIS,
+    // Ctrl chars
+    [CHAR_PROMPT_SCROLL ... EOS]            = BIGRAM_SEP_FLAG,
+};
+
+// For lowercase characters, the diff between a char
+// and its uppercase equivalent
+const s16 gCharToUpperTable[] = {
+    // Keep the é in POKéMON
+    [CHAR_e_ACUTE] = 0,
+    // English
+    CHAR_DIFF_RANGE(a, z, A),
+    // International
+    CHAR_DIFF_RANGE(a_GRAVE, a_ACUTE, A_GRAVE),
+    CHAR_DIFF_ENTRY(a_CIRCUMFLEX, A_CIRCUMFLEX),
+    CHAR_DIFF_RANGE(c_CEDILLA, e_GRAVE, C_CEDILLA),
+    CHAR_DIFF_RANGE(e_CIRCUMFLEX, i_GRAVE, E_CIRCUMFLEX),
+    CHAR_DIFF_ENTRY(i_ACUTE, I_ACUTE),
+    CHAR_DIFF_RANGE(i_CIRCUMFLEX, n_TILDE, I_CIRCUMFLEX),
+    CHAR_DIFF_RANGE(a_DIAERESIS, u_DIAERESIS, A_DIAERESIS),
+    // Ctrl chars
+    [CHAR_PROMPT_SCROLL ... EOS] = 0
+};
+
 static u16 RenderText(struct TextPrinter *textPrinter)
 {
     struct TextPrinterSubStruct *subStruct = (struct TextPrinterSubStruct *)(&textPrinter->subStructFields);

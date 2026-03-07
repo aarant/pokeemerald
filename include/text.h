@@ -138,6 +138,7 @@ extern struct TextGlyph gCurGlyph;
 
 #if DECAP_ENABLED
 extern const u16 gCharAttrTable[];
+extern const s16 gCharToUpperTable[];
 #define CHAR_MASK 0xFF
 // in gCharAttrTable, 0x100 represents a character treated as uppercase,
 // but that maps to itself; only the lower 8 bits are used for mapping
@@ -151,9 +152,10 @@ extern const u16 gCharAttrTable[];
 // Includes whitespace, digits, /, and ctrl chars
 // Basically helps match the regex [/0-9\s]([A-Z]{2})[/0-9\s]
 #define IS_BIGRAM_SEP(x) (gCharAttrTable[(x) & CHAR_MASK] & BIGRAM_SEP_MASK)
+
 #define TO_LOWER(x) (((x) + gCharAttrTable[(x)]) & CHAR_MASK)
 
-#endif
+#define TO_UPPER(x) ((x) + gCharToUpperTable[(x)])
 
 void DeactivateAllTextPrinters(void);
 u16 AddTextPrinterParameterized(u8 windowId, u8 fontId, const u8 *str, u8 x, u8 y, u8 speed, void (*callback)(struct TextPrinterTemplate *, u16));
