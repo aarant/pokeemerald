@@ -986,7 +986,7 @@ static const struct InGameTrade sIngameTrades[] =
 {
     [INGAME_TRADE_SEEDOT] =
     {
-        .nickname = _("DOTS"),
+        .nickname = _C("DOTS"),
         .species = SPECIES_SEEDOT,
         .ivs = {5, 4, 5, 4, 4, 4},
         .abilityNum = 1,
@@ -995,14 +995,14 @@ static const struct InGameTrade sIngameTrades[] =
         .personality = 0x84,
         .heldItem = ITEM_CHESTO_BERRY,
         .mailNum = -1,
-        .otName = _("KOBE"),
+        .otName = _C("KOBE"),
         .otGender = MALE,
         .sheen = 10,
         .requestedSpecies = SPECIES_RALTS
     },
     [INGAME_TRADE_PLUSLE] =
     {
-        .nickname = _("PLUSES"),
+        .nickname = _C("PLUSES"),
         .species = SPECIES_PLUSLE,
         .ivs = {4, 4, 4, 5, 5, 4},
         .abilityNum = 0,
@@ -1011,14 +1011,14 @@ static const struct InGameTrade sIngameTrades[] =
         .personality = 0x6F,
         .heldItem = ITEM_WOOD_MAIL,
         .mailNum = 0,
-        .otName = _("ROMAN"),
+        .otName = _C("ROMAN"),
         .otGender = MALE,
         .sheen = 10,
         .requestedSpecies = SPECIES_VOLBEAT
     },
     [INGAME_TRADE_HORSEA] =
     {
-        .nickname = _("SEASOR"),
+        .nickname = _C("SEASOR"),
         .species = SPECIES_HORSEA,
         .ivs = {5, 4, 4, 4, 5, 4},
         .abilityNum = 0,
@@ -1027,14 +1027,14 @@ static const struct InGameTrade sIngameTrades[] =
         .personality = 0x7F,
         .heldItem = ITEM_WAVE_MAIL,
         .mailNum = 1,
-        .otName = _("SKYLAR"),
+        .otName = _C("SKYLAR"),
         .otGender = MALE,
         .sheen = 10,
         .requestedSpecies = SPECIES_BAGON
     },
     [INGAME_TRADE_MEOWTH] =
     {
-        .nickname = _("MEOWOW"),
+        .nickname = _C("MEOWOW"),
         .species = SPECIES_MEOWTH,
         .ivs = {4, 5, 4, 5, 4, 4},
         .abilityNum = 0,
@@ -1043,7 +1043,7 @@ static const struct InGameTrade sIngameTrades[] =
         .personality = 0x8B,
         .heldItem = ITEM_RETRO_MAIL,
         .mailNum = 2,
-        .otName = _("ISIS"),
+        .otName = _C("ISIS"),
         .otGender = FEMALE,
         .sheen = 10,
         .requestedSpecies = SPECIES_SKITTY
