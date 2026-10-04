@@ -1395,7 +1395,7 @@ static void NamingScreen_NoIcon(void)
 
 static void NamingScreen_CreatePlayerIcon(void)
 {
-    u8 rivalGfxId;
+    u16 rivalGfxId;
     u8 spriteId;
 
     rivalGfxId = GetRivalAvatarGraphicsIdByStateIdAndGender(PLAYER_AVATAR_STATE_NORMAL, sNamingScreen->monSpecies);
@@ -1960,7 +1960,7 @@ static void PrintKeyboardKeys(u8 window, u8 page)
     PutWindowTilemap(window);
 }
 
-static const u8 *const sNextKeyboardPageTilemaps[] =
+static const u32 *const sNextKeyboardPageTilemaps[] =
 {
     [KBPAGE_SYMBOLS] = gNamingScreenKeyboardUpper_Tilemap,
     [KBPAGE_LETTERS_UPPER] = gNamingScreenKeyboardLower_Tilemap, // lower

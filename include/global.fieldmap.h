@@ -7,18 +7,35 @@
 #define MAPGRID_METATILE_ID_MASK 0x03FF // Bits 0-9
 #define MAPGRID_COLLISION_MASK   0x0C00 // Bits 10-11
 #define MAPGRID_ELEVATION_MASK   0xF000 // Bits 12-15
+#define MAPGRID_METATILE_ID_SHIFT 0
 #define MAPGRID_COLLISION_SHIFT  10
 #define MAPGRID_ELEVATION_SHIFT  12
 
+#define PACK_METATILE(metatileId) PACK(metatileId, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
+#define PACK_COLLISION(collision) PACK(collision, MAPGRID_COLLISION_SHIFT, MAPGRID_COLLISION_MASK)
+#define PACK_ELEVATION(elevation) PACK(elevation, MAPGRID_ELEVATION_SHIFT, MAPGRID_ELEVATION_MASK)
+#define UNPACK_METATILE(data)  UNPACK(data, MAPGRID_METATILE_ID_SHIFT, MAPGRID_METATILE_ID_MASK)
+#define UNPACK_COLLISION(data) UNPACK(data, MAPGRID_COLLISION_SHIFT, MAPGRID_COLLISION_MASK)
+#define UNPACK_ELEVATION(data) UNPACK(data, MAPGRID_ELEVATION_SHIFT, MAPGRID_ELEVATION_MASK)
+
 // An undefined map grid block has all metatile id bits set and nothing else
 #define MAPGRID_UNDEFINED   MAPGRID_METATILE_ID_MASK
+
+// When setting impassability manually GF sets all the collision bits
+#define MAPGRID_IMPASSABLE  MAPGRID_COLLISION_MASK
 
 // Masks/shifts for metatile attributes
 // Metatile attributes consist of an 8 bit behavior value, 4 unused bits, and a 4 bit layer type value
 // This is the data stored in each data/tilesets/*/*/metatile_attributes.bin file
 #define METATILE_ATTR_BEHAVIOR_MASK 0x00FF // Bits 0-7
 #define METATILE_ATTR_LAYER_MASK    0xF000 // Bits 12-15
+#define METATILE_ATTR_BEHAVIOR_SHIFT 0
 #define METATILE_ATTR_LAYER_SHIFT   12
+
+#define PACK_BEHAVIOR(behavior) PACK(behavior, METATILE_ATTR_BEHAVIOR_SHIFT, METATILE_ATTR_BEHAVIOR_MASK)
+#define PACK_LAYER_TYPE(layerType) PACK(layerType, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
+#define UNPACK_BEHAVIOR(data) UNPACK(data, METATILE_ATTR_BEHAVIOR_SHIFT, METATILE_ATTR_BEHAVIOR_MASK)
+#define UNPACK_LAYER_TYPE(data) UNPACK(data, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
 
 enum {
     METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
@@ -63,25 +80,24 @@ struct BackupMapLayout
     u16 *map;
 };
 
-struct ObjectEventTemplate
+struct __attribute__((packed, aligned(4))) ObjectEventTemplate
 {
     /*0x00*/ u8 localId;
-    /*0x01*/ u8 graphicsId;
-    /*0x02*/ u8 kind; // Always OBJ_KIND_NORMAL in Emerald.
-    /*0x03*/ //u8 padding1;
+    /*0x01*/ u16 graphicsId;
+    /*0x03*/ u8 kind; // Always OBJ_KIND_NORMAL in Emerald.
     /*0x04*/ s16 x;
     /*0x06*/ s16 y;
     /*0x08*/ u8 elevation;
     /*0x09*/ u8 movementType;
     /*0x0A*/ u16 movementRangeX:4;
              u16 movementRangeY:4;
-             //u16 padding2:8;
+             u16 unused:8;
     /*0x0C*/ u16 trainerType;
     /*0x0E*/ u16 trainerRange_berryTreeId;
     /*0x10*/ const u8 *script;
     /*0x14*/ u16 flagId;
-    /*0x16*/ //u8 padding3[2];
-};
+    /*0x16*/ u16 filler;
+}; // size = 0x18
 
 struct WarpEvent
 {
@@ -150,7 +166,7 @@ struct MapHeader
     /* 0x0C */ const struct MapConnections *connections;
     /* 0x10 */ u16 music;
     /* 0x12 */ u16 mapLayoutId;
-    /* 0x14 */ u8 regionMapSectionId;
+    /* 0x14 */ mapsec_u8_t regionMapSectionId;
     /* 0x15 */ u8 cave;
     /* 0x16 */ u8 weather;
     /* 0x17 */ u8 mapType;
@@ -195,9 +211,9 @@ struct ObjectEvent
              u32 disableJumpLandingGroundEffect:1;
              u32 fixedPriority:1;
              u32 hideReflection:1;
-             //u32 padding:4;
-    /*0x04*/ u8 spriteId;
-    /*0x05*/ u8 graphicsId;
+             u32 shiny:1; // OW mon shininess
+             u32 padding:3;
+    /*0x04*/ u16 graphicsId; // 11 bits for species; high 5 bits for form
     /*0x06*/ u8 movementType;
     /*0x07*/ u8 trainerType;
     /*0x08*/ u8 localId;
@@ -210,8 +226,11 @@ struct ObjectEvent
     /*0x14*/ struct Coords16 previousCoords;
     /*0x18*/ u16 facingDirection:4; // current direction?
              u16 movementDirection:4;
-             u16 rangeX:4;
-             u16 rangeY:4;
+             struct __attribute__((packed))
+             {
+                u16 rangeX:4;
+                u16 rangeY:4;
+             } range;
     /*0x1A*/ u8 fieldEffectSpriteId;
     /*0x1B*/ u8 warpArrowSpriteId;
     /*0x1C*/ u8 movementActionId;
@@ -220,15 +239,8 @@ struct ObjectEvent
     /*0x1F*/ u8 previousMetatileBehavior;
     /*0x20*/ u8 previousMovementDirection;
     /*0x21*/ u8 directionSequenceIndex;
-    /*0x22*/ union __attribute__((packed)) {
-        u8 playerCopyableMovement; // COPY_MOVE_*
-        struct __attribute__((packed)) {
-            u16 species:10; // 11 bits; 1024 species
-            u16 form:5; // Used for Deoxys, Unown, etc
-            u16 shiny:1;
-        } mon;
-        u16 asU16;
-    } extra;
+    /*0x22*/ u8 playerCopyableMovement; // COPY_MOVE_*
+    /*0x23*/ u8 spriteId;
     /*size = 0x24*/
 };
 
@@ -243,7 +255,7 @@ struct ObjectEventGraphicsInfo
     /*0x0C*/ u8 paletteSlot:4;
              u8 shadowSize:2;
              u8 inanimate:1;
-             u8 disableReflectionPaletteLoad:1;
+             u8 compressed:1;
     /*0x0D*/ u8 tracks;
     /*0x10*/ const struct OamData *oam;
     /*0x14*/ const struct SubspriteTable *subspriteTables;

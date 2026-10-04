@@ -52,6 +52,17 @@
 #include "constants/union_room.h"
 #include "constants/weather.h"
 
+#define SPECIAL_LOCALIDS_START (min(LOCALID_CAMERA, \
+                                min(LOCALID_PLAYER, \
+                                    LOCALID_BERRY_BLENDER_PLAYER_END - MAX_RFU_PLAYERS + 1)))
+
+// The object event templates on a map cannot use the special IDs listed above or they can behave unexpectedly.
+// For more details on these special IDs see their definitions in 'include/constants/event_objects.h'.
+// OBJECT_EVENT_TEMPLATES_COUNT should always be low enough that it doesn't overlap with these IDs.
+#if OBJECT_EVENT_TEMPLATES_COUNT >= SPECIAL_LOCALIDS_START
+#error "OBJECT_EVENT_TEMPLATES_COUNT is too large. Object event local IDs may overlap with reserved IDs."
+#endif
+
 // this file was known as evobjmv.c in Game Freak's original source
 
 enum {
@@ -103,6 +114,7 @@ static EWRAM_DATA struct LockedAnimObjectEvents *sLockedAnimObjectEvents = {0};
 
 static void MoveCoordsInDirection(u32, s16 *, s16 *, s16, s16);
 static bool8 ObjectEventExecSingleMovementAction(struct ObjectEvent *, struct Sprite *);
+static bool32 UpdateMonMoveInPlace(struct ObjectEvent *, struct Sprite *);
 static void SetMovementDelay(struct Sprite *, s16);
 static bool8 WaitForMovementDelay(struct Sprite *);
 static u8 GetCollisionInDirection(struct ObjectEvent *, u8);
@@ -195,6 +207,8 @@ static const struct ObjectEventGraphicsInfo *SpeciesToGraphicsInfo(u16 species, 
 static bool8 NpcTakeStep(struct Sprite *);
 static bool8 IsElevationMismatchAt(u8, s16, s16);
 static bool8 AreElevationsCompatible(u8, u8);
+static u16 PackGraphicsId(const struct ObjectEventTemplate *template);
+static void CopyObjectGraphicsInfoToSpriteTemplate_WithMovementType(u16 graphicsId, u16 movementType, struct SpriteTemplate *spriteTemplate, const struct SubspriteTable **subspriteTables);
 
 static const struct SpriteFrameImage sPicTable_PechaBerryTree[];
 
@@ -534,6 +548,13 @@ const u8 gInitialMovementTypeFacingDirections[NUM_MOVEMENT_TYPES] = {
 // Not a real OW palette tag; used for the white flash applied to followers
 #define OBJ_EVENT_PAL_TAG_WHITE                   (OBJ_EVENT_PAL_TAG_NONE - 1)
 #define OBJ_EVENT_PAL_TAG_NONE 0x11FF
+
+#if OW_GFX_COMPRESS
+// This + localId is used as the tileTag
+// for compressed graphicsInfos
+// '(C)ompressed (E)vent'
+#define COMP_OW_TILE_TAG_BASE 0xCE00
+#endif
 
 #include "data/object_events/object_event_graphics_info_pointers.h"
 #include "data/field_effects/field_effect_object_template_pointers.h"
@@ -1295,9 +1316,9 @@ static const u8 sPlayerDirectionToCopyDirection[][4] = {
 static void ClearObjectEvent(struct ObjectEvent *objectEvent)
 {
     *objectEvent = (struct ObjectEvent){};
-    objectEvent->localId = OBJ_EVENT_ID_PLAYER;
-    objectEvent->mapNum = MAP_NUM(UNDEFINED);
-    objectEvent->mapGroup = MAP_GROUP(UNDEFINED);
+    objectEvent->localId = LOCALID_PLAYER;
+    objectEvent->mapNum = MAP_NUM(MAP_UNDEFINED);
+    objectEvent->mapGroup = MAP_GROUP(MAP_UNDEFINED);
     objectEvent->movementActionId = MOVEMENT_ACTION_NONE;
 }
 
@@ -1346,7 +1367,7 @@ u8 GetFirstInactiveObjectEventId(void)
 
 u8 GetObjectEventIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroupId)
 {
-    if (localId < OBJ_EVENT_ID_FOLLOWER)
+    if (localId < LOCALID_FOLLOWING_POKEMON)
         return GetObjectEventIdByLocalIdAndMapInternal(localId, mapNum, mapGroupId);
 
     return GetObjectEventIdByLocalId(localId);
@@ -1412,7 +1433,14 @@ static u8 InitObjectEventStateFromTemplate(const struct ObjectEventTemplate *tem
     y = template->y + MAP_OFFSET;
     objectEvent->active = TRUE;
     objectEvent->triggerGroundEffectsOnMove = TRUE;
-    objectEvent->graphicsId = template->graphicsId;
+    objectEvent->graphicsId = PackGraphicsId(template);
+    SetObjectEventDynamicGraphicsId(objectEvent);
+    if (IS_OW_MON_OBJ(objectEvent)) {
+        if (template->script && template->script[0] == 0x7d)
+            objectEvent->shiny = T1_READ_16(&template->script[2]) >> 15;
+        else if (template->trainerRange_berryTreeId)
+            objectEvent->shiny = VarGet(template->trainerRange_berryTreeId) >> 5;
+    }
     objectEvent->movementType = template->movementType;
     objectEvent->localId = template->localId;
     objectEvent->mapNum = mapNum;
@@ -1425,20 +1453,19 @@ static u8 InitObjectEventStateFromTemplate(const struct ObjectEventTemplate *tem
     objectEvent->previousCoords.y = y;
     objectEvent->currentElevation = template->elevation;
     objectEvent->previousElevation = template->elevation;
-    objectEvent->rangeX = template->movementRangeX;
-    objectEvent->rangeY = template->movementRangeY;
+    objectEvent->range.rangeX = template->movementRangeX;
+    objectEvent->range.rangeY = template->movementRangeY;
     objectEvent->trainerType = template->trainerType;
     objectEvent->mapNum = mapNum;
     objectEvent->trainerRange_berryTreeId = template->trainerRange_berryTreeId;
     objectEvent->previousMovementDirection = gInitialMovementTypeFacingDirections[template->movementType];
     SetObjectEventDirection(objectEvent, objectEvent->previousMovementDirection);
-    SetObjectEventDynamicGraphicsId(objectEvent);
     if (sMovementTypeHasRange[objectEvent->movementType])
     {
-        if (objectEvent->rangeX == 0)
-            objectEvent->rangeX++;
-        if (objectEvent->rangeY == 0)
-            objectEvent->rangeY++;
+        if (objectEvent->range.rangeX == 0)
+            objectEvent->range.rangeX++;
+        if (objectEvent->range.rangeY == 0)
+            objectEvent->range.rangeY++;
     }
     return objectEventId;
 }
@@ -1451,7 +1478,7 @@ u8 Unref_TryInitLocalObjectEvent(u8 localId)
 
     if (gMapHeader.events != NULL)
     {
-        if (InBattlePyramid())
+        if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
             objectEventCount = GetNumBattlePyramidObjectEvents();
         else if (InTrainerHill())
             objectEventCount = HILL_TRAINERS_PER_FLOOR;
@@ -1496,8 +1523,9 @@ static bool8 GetAvailableObjectEventId(u16 localId, u8 mapNum, u8 mapGroup, u8 *
 static void RemoveObjectEvent(struct ObjectEvent *objectEvent)
 {
     objectEvent->active = FALSE;
-    objectEvent->extra.asU16 = 0; // zero potential species info
     RemoveObjectEventInternal(objectEvent);
+    // zero potential species info
+    objectEvent->graphicsId = objectEvent->shiny = 0;
 }
 
 void RemoveObjectEventByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
@@ -1512,11 +1540,9 @@ void RemoveObjectEventByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup)
 
 static void RemoveObjectEventInternal(struct ObjectEvent *objectEvent)
 {
-    u8 paletteNum;
     struct SpriteFrameImage image;
     image.size = GetObjectEventGraphicsInfo(objectEvent->graphicsId)->size;
     gSprites[objectEvent->spriteId].images = &image;
-    paletteNum = gSprites[objectEvent->spriteId].oam.paletteNum;
     // It's possible that this function is called while the sprite pointed to `== sDummySprite`, i.e during map resume;
     // In this case, don't free the palette as `paletteNum` is likely blank dummy data
     if (!gSprites[objectEvent->spriteId].inUse &&
@@ -1524,8 +1550,16 @@ static void RemoveObjectEventInternal(struct ObjectEvent *objectEvent)
         gSprites[objectEvent->spriteId].callback == SpriteCallbackDummy) {
         DestroySprite(&gSprites[objectEvent->spriteId]);
     } else {
+        u32 paletteNum = gSprites[objectEvent->spriteId].oam.paletteNum;
+        #if OW_GFX_COMPRESS
+        u16 tileStart = gSprites[objectEvent->spriteId].sheetTileStart;
+        #endif
         DestroySprite(&gSprites[objectEvent->spriteId]);
         FieldEffectFreePaletteIfUnused(paletteNum);
+        #if OW_GFX_COMPRESS
+        if (tileStart)
+            FieldEffectFreeTilesIfUnused(tileStart);
+        #endif
     }
 }
 
@@ -1539,6 +1573,98 @@ void RemoveAllObjectEventsExceptPlayer(void)
             RemoveObjectEvent(&gObjectEvents[i]);
     }
 }
+
+// Free a sprite's current tiles and reallocate with a new size
+// Used when changing to a gfx info with a larger size
+static s16 ReallocSpriteTiles(struct Sprite *sprite, u32 byteSize) {
+    s16 i;
+    bool32 wasVisible = sprite->invisible;
+    sprite->invisible = TRUE;
+
+    i = CopySprite(sprite, sprite->x, sprite->y, 0xFF);
+    if (i < MAX_SPRITES) {
+        DestroySprite(&gSprites[i]);
+        i = AllocSpriteTiles(byteSize / TILE_SIZE_4BPP);
+        if (i >= 0) {
+            // Fill the allocated area with zeroes
+            // To avoid visual glitches if the frame hasn't been copied yet
+            CpuFastFill16(0, (u8 *)OBJ_VRAM0 + TILE_SIZE_4BPP * i, byteSize);
+            sprite->oam.tileNum = i;
+        }
+    } else {
+        i = -1;
+    }
+    
+    sprite->invisible = wasVisible;
+    return i;
+}
+
+#if OW_GFX_COMPRESS
+u16 LoadSheetGraphicsInfo(const struct ObjectEventGraphicsInfo *info, u16 uuid, struct Sprite *sprite) {
+    u16 tag = info->tileTag;
+    if (tag != TAG_NONE || info->compressed) { // sheet-based gfx
+        u32 sheetSpan = GetSpanPerImage(info->oam->shape, info->oam->size);
+        u16 oldTiles = 0;
+        u16 tileStart;
+        bool32 oldInvisible;
+        if (tag == TAG_NONE)
+            tag = COMP_OW_TILE_TAG_BASE + uuid;
+        
+        if (sprite) {
+            oldInvisible = sprite->invisible;
+            oldTiles = sprite->sheetTileStart;
+            sprite->sheetTileStart = 0; // mark unused
+            // Note: If sprite was not allocated to use a sheet,
+            // the tiles assigned to it will leak here,
+            // as its tileNum will be repointed to the new tileStart
+            // TODO: Unload static tiles!
+        }
+
+        tileStart = GetSpriteTileStartByTag(tag);
+        // sheet not loaded; unload any old tiles and load it
+        if (tileStart == TAG_NONE) {
+            struct SpriteFrameImage image = {.size = info->size, .data = info->images->data};
+            struct SpriteTemplate template = {.tileTag = tag, .images = &image};
+            // Load, then free, in order to avoid displaying garbage data
+            // before sprite's `sheetTileStart` is repointed
+            tileStart = LoadCompressedSpriteSheetByTemplate(&template, TILE_SIZE_4BPP << sheetSpan);
+            if (oldTiles) {
+                FieldEffectFreeTilesIfUnused(oldTiles);
+                // We weren't able to load the sheet;
+                // retry (after having freed), and set sprite to invisible until done
+                if (tileStart <= 0) {
+                    if (sprite)
+                        sprite->invisible = TRUE;
+                    tileStart = LoadCompressedSpriteSheetByTemplate(&template, TILE_SIZE_4BPP << sheetSpan);
+                }
+            }
+        // sheet loaded; unload any *other* sheet for sprite
+        } else if (oldTiles && oldTiles != tileStart) {
+            FieldEffectFreeTilesIfUnused(oldTiles);
+        }
+        
+        if (sprite) {
+            sprite->sheetTileStart = tileStart;
+            sprite->sheetSpan = sheetSpan;
+            sprite->usingSheet = TRUE;
+            sprite->invisible = oldInvisible;
+        }
+    // Going from sheet -> !sheet, reset tile number
+    // (sheet stays loaded)
+    // Note: It's possible to load a non-sheet gfx
+    // larger than the allocated prefix space,
+    // in which case we would have to realloc
+    // TODO: Realloc usingSheet -> !usingSheet larger gfx
+    } else if (sprite && sprite->usingSheet) {
+        sprite->oam.tileNum = sprite->sheetTileStart;
+        sprite->usingSheet = FALSE;
+    // Not usingSheet and info size differs; realloc tiles
+    } else if (sprite && !sprite->sheetTileStart && sprite->oam.size != info->oam->size) {
+        ReallocSpriteTiles(sprite, info->images->size);
+    }
+    return tag;
+}
+#endif
 
 static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEventTemplate, struct SpriteTemplate *spriteTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY)
 {
@@ -1554,12 +1680,22 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
 
     objectEvent = &gObjectEvents[objectEventId];
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
-    if (spriteTemplate->paletteTag != TAG_NONE) {
+    if (spriteTemplate->paletteTag != TAG_NONE && spriteTemplate->paletteTag != OBJ_EVENT_PAL_TAG_DYNAMIC) {
         LoadObjectEventPalette(spriteTemplate->paletteTag);
     }
 
     if (objectEvent->movementType == MOVEMENT_TYPE_INVISIBLE)
         objectEvent->invisible = TRUE;
+
+    #if OW_GFX_COMPRESS
+    spriteTemplate->tileTag = LoadSheetGraphicsInfo(graphicsInfo, objectEvent->graphicsId, NULL);
+    #endif
+
+    if (objectEvent->graphicsId >= OBJ_EVENT_GFX_MON_BASE + SPECIES_SHINY_TAG)
+    {
+        objectEvent->shiny = TRUE;
+        objectEvent->graphicsId -= SPECIES_SHINY_TAG;
+    }
 
     spriteId = CreateSprite(spriteTemplate, 0, 0, 0);
     if (spriteId == MAX_SPRITES)
@@ -1569,6 +1705,12 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
     }
 
     sprite = &gSprites[spriteId];
+    // Use palette from species palette table
+    if (spriteTemplate->paletteTag == OBJ_EVENT_PAL_TAG_DYNAMIC) {
+        sprite->oam.paletteNum = LoadDynamicFollowerPalette(OW_SPECIES(objectEvent), OW_FORM(objectEvent), objectEvent->shiny);
+    }
+    if (OW_GFX_COMPRESS && sprite->usingSheet)
+        sprite->sheetSpan = GetSpanPerImage(sprite->oam.shape, sprite->oam.size);
     GetMapCoordsFromSpritePos(objectEvent->currentCoords.x + cameraX, objectEvent->currentCoords.y + cameraY, &sprite->x, &sprite->y);
     sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
     sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
@@ -1586,15 +1728,36 @@ static u8 TrySetupObjectEventSprite(const struct ObjectEventTemplate *objectEven
     return objectEventId;
 }
 
-static u8 TrySpawnObjectEventTemplate(const struct ObjectEventTemplate *objectEventTemplate, u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY) {
+// Pack pokemon form info into a graphicsId, from a template's script
+static u16 PackGraphicsId(const struct ObjectEventTemplate *template) {
+    u16 graphicsId = template->graphicsId;
+    u32 form = 0;
+    // set form based on template's script,
+    // if first command is bufferspeciesname
+    if (IS_OW_MON_OBJ(template)) {
+        if (template->script && template->script[0] == 0x7d) {
+            form = T1_READ_16(&template->script[2]);
+            form = (form >> 10) & 0x1F;
+        } else if (template->trainerRange_berryTreeId && !template->trainerType) {
+            form = template->trainerRange_berryTreeId & 0x1F;
+        }
+        graphicsId |= form << OBJ_EVENT_GFX_SPECIES_BITS;
+    }
+    return graphicsId;
+}
+
+static u8
+TrySpawnObjectEventTemplate(const struct ObjectEventTemplate *objectEventTemplate,
+                            u8 mapNum, u8 mapGroup, s16 cameraX, s16 cameraY) {
     u8 objectEventId;
+    u16 graphicsId = PackGraphicsId(objectEventTemplate);
     struct SpriteTemplate spriteTemplate;
     struct SpriteFrameImage spriteFrameImage;
     const struct ObjectEventGraphicsInfo *graphicsInfo;
     const struct SubspriteTable *subspriteTables = NULL;
 
-    graphicsInfo = GetObjectEventGraphicsInfo(objectEventTemplate->graphicsId);
-    MakeSpriteTemplateFromObjectEventTemplate(objectEventTemplate, &spriteTemplate, &subspriteTables);
+    graphicsInfo = GetObjectEventGraphicsInfo(graphicsId);
+    CopyObjectGraphicsInfoToSpriteTemplate_WithMovementType(graphicsId, objectEventTemplate->movementType, &spriteTemplate, &subspriteTables);
     spriteFrameImage.size = graphicsInfo->size;
     spriteTemplate.images = &spriteFrameImage;
     objectEventId = TrySetupObjectEventSprite(objectEventTemplate, &spriteTemplate, mapNum, mapGroup, cameraX, cameraY);
@@ -1604,28 +1767,6 @@ static u8 TrySpawnObjectEventTemplate(const struct ObjectEventTemplate *objectEv
     gSprites[gObjectEvents[objectEventId].spriteId].images = graphicsInfo->images;
     if (subspriteTables)
         SetSubspriteTables(&gSprites[gObjectEvents[objectEventId].spriteId], subspriteTables);
-
-    // Set species based on script header
-    if (objectEventTemplate->graphicsId == OBJ_EVENT_GFX_OW_MON && objectEventTemplate->script) {
-        const u8 *script = objectEventTemplate->script;
-        if (script[0] == 0x7d) { // SCR_OP_BUFFERSPECIESNAME
-            u16 species;
-            u8 form;
-            bool8 shiny;
-            gObjectEvents[objectEventId].extra.asU16 = script[2] | script[3] << 8;
-            species = gObjectEvents[objectEventId].extra.mon.species;
-            form = gObjectEvents[objectEventId].extra.mon.form;
-            shiny = gObjectEvents[objectEventId].extra.mon.shiny;
-            FollowerSetGraphics(&gObjectEvents[objectEventId], species, form, shiny);
-        }
-    // Set runtime species based on VAR_TEMP_4, if template has a dynamic graphics ID
-    } else if (objectEventTemplate->graphicsId >= OBJ_EVENT_GFX_VARS && VarGetObjectEventGraphicsId(objectEventTemplate->graphicsId - OBJ_EVENT_GFX_VARS) == OBJ_EVENT_GFX_OW_MON) {
-        gObjectEvents[objectEventId].extra.asU16 = VarGet(VAR_TEMP_4);
-        FollowerSetGraphics(&gObjectEvents[objectEventId],
-            gObjectEvents[objectEventId].extra.mon.species,
-            gObjectEvents[objectEventId].extra.mon.form,
-            gObjectEvents[objectEventId].extra.mon.form);
-    }
 
     return objectEventId;
 }
@@ -1639,7 +1780,7 @@ u8 SpawnSpecialObjectEvent(struct ObjectEventTemplate *objectEventTemplate)
     return TrySpawnObjectEventTemplate(objectEventTemplate, gSaveBlock1Ptr->location.mapNum, gSaveBlock1Ptr->location.mapGroup, cameraX, cameraY);
 }
 
-u8 SpawnSpecialObjectEventParameterized(u8 graphicsId, u8 movementBehavior, u8 localId, s16 x, s16 y, u8 elevation)
+u8 SpawnSpecialObjectEventParameterized(u16 graphicsId, u8 movementBehavior, u8 localId, s16 x, s16 y, u8 elevation)
 {
     struct ObjectEventTemplate objectEventTemplate;
 
@@ -1647,7 +1788,7 @@ u8 SpawnSpecialObjectEventParameterized(u8 graphicsId, u8 movementBehavior, u8 l
     y -= MAP_OFFSET;
     objectEventTemplate.localId = localId;
     objectEventTemplate.graphicsId = graphicsId;
-    objectEventTemplate.kind = OBJ_KIND_NORMAL;
+    // objectEventTemplate.kind = OBJ_KIND_NORMAL;
     objectEventTemplate.x = x;
     objectEventTemplate.y = y;
     objectEventTemplate.elevation = elevation;
@@ -1696,44 +1837,55 @@ static void MakeSpriteTemplateFromObjectEventTemplate(const struct ObjectEventTe
     CopyObjectGraphicsInfoToSpriteTemplate_WithMovementType(objectEventTemplate->graphicsId, objectEventTemplate->movementType, spriteTemplate, subspriteTables);
 }
 
+// Loads information from graphicsId, with shininess separate
+// also can write palette tag to the template
+static u8 LoadDynamicFollowerPaletteFromGraphicsId(u16 graphicsId, bool8 shiny, struct SpriteTemplate *template) {
+    u16 species = ((graphicsId & OBJ_EVENT_GFX_SPECIES_MASK) - OBJ_EVENT_GFX_MON_BASE);
+    u8 form = (graphicsId >> OBJ_EVENT_GFX_SPECIES_BITS);
+    const struct CompressedSpritePalette *spritePalette = &(shiny ? gMonShinyPaletteTable : gMonPaletteTable)[species];
+    u8 paletteNum = LoadDynamicFollowerPalette(species, form, shiny);
+    if (template)
+        template->paletteTag = spritePalette->tag;
+    return paletteNum;
+}
+
 // Used to create a sprite using a graphicsId associated with object events.
 u8 CreateObjectGraphicsSprite(u16 graphicsId, void (*callback)(struct Sprite *), s16 x, s16 y, u8 subpriority)
 {
     struct SpriteTemplate *spriteTemplate;
     const struct SubspriteTable *subspriteTables;
+    const struct ObjectEventGraphicsInfo *graphicsInfo;
     struct Sprite *sprite;
     u8 spriteId;
-    u16 species;
-    u8 form;
-    bool8 shiny;
     u32 paletteNum;
 
     spriteTemplate = Alloc(sizeof(struct SpriteTemplate));
-    if (graphicsId == OBJ_EVENT_GFX_OW_MON && GetFollowerInfo(&species, &form, &shiny)) {
-        const struct ObjectEventGraphicsInfo *graphicsInfo = SpeciesToGraphicsInfo(species, form);
-        spriteTemplate->tileTag = graphicsInfo->tileTag;
-        spriteTemplate->paletteTag = graphicsInfo->paletteTag;
-        spriteTemplate->oam = graphicsInfo->oam;
-        spriteTemplate->anims = graphicsInfo->anims;
-        spriteTemplate->images = graphicsInfo->images;
-        spriteTemplate->affineAnims = graphicsInfo->affineAnims;
-        spriteTemplate->callback = callback;
-        subspriteTables = graphicsInfo->subspriteTables;
-    } else
-        CopyObjectGraphicsInfoToSpriteTemplate(graphicsId, callback, spriteTemplate, &subspriteTables);
+    CopyObjectGraphicsInfoToSpriteTemplate(graphicsId, callback, spriteTemplate, &subspriteTables);
 
     if (spriteTemplate->paletteTag == OBJ_EVENT_PAL_TAG_DYNAMIC) {
-        paletteNum = LoadDynamicFollowerPalette(species, form, shiny);
+        struct ObjectEvent *obj = GetFollowerObject();
+        // Use shininess info from follower object
+        // in future this should be passed in
+        paletteNum = LoadDynamicFollowerPaletteFromGraphicsId(graphicsId, obj ? obj->shiny : FALSE, spriteTemplate);
         spriteTemplate->paletteTag = GetSpritePaletteTagByPaletteNum(paletteNum);
     } else if (spriteTemplate->paletteTag != TAG_NONE)
         LoadObjectEventPalette(spriteTemplate->paletteTag);
 
+    #if OW_GFX_COMPRESS
+    graphicsInfo = GetObjectEventGraphicsInfo(graphicsId);
+    // Checking only for compressed here so as not to mess with decorations
+    if (graphicsInfo->compressed)
+        spriteTemplate->tileTag = LoadSheetGraphicsInfo(graphicsInfo, graphicsId, NULL);
+    #endif
     spriteId = CreateSprite(spriteTemplate, x, y, subpriority);
+
     Free(spriteTemplate);
 
     if (spriteId != MAX_SPRITES && subspriteTables != NULL)
     {
         sprite = &gSprites[spriteId];
+        if (OW_GFX_COMPRESS && graphicsInfo->compressed)
+            sprite->sheetSpan = GetSpanPerImage(sprite->oam.shape, sprite->oam.size);
         SetSubspriteTables(sprite, subspriteTables);
         sprite->subspriteMode = SUBSPRITES_IGNORE_PRIORITY;
     }
@@ -1748,7 +1900,7 @@ u8 CreateObjectGraphicsSprite(u16 graphicsId, void (*callback)(struct Sprite *),
 // A unique id is given as an argument and stored in the sprite data to allow referring back to the same virtual object.
 // They can be turned (and, in the case of the Union Room, animated teleporting in and out) but do not have movement types
 // or any of the other data normally associated with object events.
-u8 CreateVirtualObject(u8 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevation, u8 direction)
+u8 CreateVirtualObject(u16 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevation, u8 direction)
 {
     u8 spriteId;
     struct Sprite *sprite;
@@ -1856,7 +2008,10 @@ static u8 LoadDynamicFollowerPalette(u16 species, u8 form, bool32 shiny) {
         spritePalette.data = gFollowerPalettes[species][shiny & 1];
 
     // Check if pal data must be decompressed
+    /* // There goes Castform making this harder than it needs to be...
     if (IsLZ77Data(spritePalette.data, PLTT_SIZE_4BPP, PLTT_SIZE_4BPP)) {
+    */
+    if (IsLZ77Data(spritePalette.data, PLTT_SIZE_4BPP, PLTT_SIZE_4BPP * NUM_CASTFORM_FORMS)) {
         // IsLZ77Data guarantees word-alignment, so casting this is safe
         LZ77UnCompWram((u32*)spritePalette.data, gDecompressionBuffer);
         spritePalette.data = (void*)gDecompressionBuffer;
@@ -1871,69 +2026,41 @@ static u8 LoadDynamicFollowerPalette(u16 species, u8 form, bool32 shiny) {
 // Set graphics & sprite for a follower object event by species & shininess.
 static void FollowerSetGraphics(struct ObjectEvent *objEvent, u16 species, u8 form, bool8 shiny) {
     const struct ObjectEventGraphicsInfo *graphicsInfo = SpeciesToGraphicsInfo(species, form);
-    objEvent->graphicsId = OBJ_EVENT_GFX_OW_MON;
     ObjectEventSetGraphics(objEvent, graphicsInfo);
-    objEvent->graphicsId = OBJ_EVENT_GFX_OW_MON;
-    objEvent->extra.mon.species = species;
-    objEvent->extra.mon.form = form;
-    objEvent->extra.mon.shiny = shiny;
-    if (graphicsInfo->paletteTag == OBJ_EVENT_PAL_TAG_DYNAMIC) {
-        // Use palette from species palette table
+    objEvent->graphicsId = (OBJ_EVENT_GFX_MON_BASE + species) & OBJ_EVENT_GFX_SPECIES_MASK;
+    objEvent->graphicsId |= form << OBJ_EVENT_GFX_SPECIES_BITS;
+    objEvent->shiny = shiny;
+    if (graphicsInfo->paletteTag == OBJ_EVENT_PAL_TAG_DYNAMIC) { // Use palette from species palette table
         struct Sprite *sprite = &gSprites[objEvent->spriteId];
         // Free palette if otherwise unused
         sprite->inUse = FALSE;
         FieldEffectFreePaletteIfUnused(sprite->oam.paletteNum);
         sprite->inUse = TRUE;
         sprite->oam.paletteNum = LoadDynamicFollowerPalette(species, form, shiny);
-    } else if (gWeatherPtr->currWeather != WEATHER_FOG_HORIZONTAL) {
-        // don't want to weather blend in fog
+    } else if (gWeatherPtr->currWeather != WEATHER_FOG_HORIZONTAL) // don't want to weather blend in fog
         UpdateSpritePaletteWithWeather(gSprites[objEvent->spriteId].oam.paletteNum);
-    }
-}
-
-// Free a sprite's current tiles and reallocate with a new size
-// Used when changing to a gfx info with a larger size
-static s16 ReallocSpriteTiles(struct Sprite *sprite, u32 byteSize) {
-    s16 i;
-    bool32 wasVisible = sprite->invisible;
-    sprite->invisible = TRUE;
-
-    i = CopySprite(sprite, sprite->x, sprite->y, 0xFF);
-    if (i < MAX_SPRITES) {
-        DestroySprite(&gSprites[i]);
-        i = AllocSpriteTiles(byteSize / TILE_SIZE_4BPP);
-        if (i >= 0) {
-            // Fill the allocated area with zeroes
-            // To avoid visual glitches if the frame hasn't been copied yet
-            CpuFastFill16(0, (u8 *)OBJ_VRAM0 + TILE_SIZE_4BPP * i, byteSize);
-            sprite->oam.tileNum = i;
-        }
-    } else {
-        i = -1;
-    }
-
-    sprite->invisible = wasVisible;
-    return i;
 }
 
 // Like FollowerSetGraphics, but does not recenter sprite on a metatile
 // Intended to be used for mid-movement form changes, etc.
 static void RefreshFollowerGraphics(struct ObjectEvent *objEvent) {
-    u16 species = objEvent->extra.mon.species;
-    u8 form = objEvent->extra.mon.form;
-    u8 shiny = objEvent->extra.mon.shiny;
+    u32 species = OW_SPECIES(objEvent);
+    u32 form = OW_FORM(objEvent);
+    u32 shiny = objEvent->shiny;
     const struct ObjectEventGraphicsInfo *graphicsInfo = SpeciesToGraphicsInfo(species, form);
     struct Sprite *sprite = &gSprites[objEvent->spriteId];
     u32 i = FindObjectEventPaletteIndexByTag(graphicsInfo->paletteTag);
 
-    if (LARGE_OW_SUPPORT) {
-        // If gfx size changes, we need to reallocate tiles
-        if (graphicsInfo->oam->size != sprite->oam.size) {
+    if (graphicsInfo->oam->size != sprite->oam.size) {
+        if (LARGE_OW_SUPPORT && !OW_GFX_COMPRESS)
             ReallocSpriteTiles(sprite, graphicsInfo->images->size);
-            // Add difference in Y vectors
-            sprite->y += -(graphicsInfo->height >> 1) - sprite->centerToCornerVecY;
-        }
+        // Add difference in Y vectors
+        sprite->y += -(graphicsInfo->height >> 1) - sprite->centerToCornerVecY;
     }
+
+    #if OW_GFX_COMPRESS
+    LoadSheetGraphicsInfo(graphicsInfo, objEvent->graphicsId, sprite);
+    #endif
 
     sprite->oam.shape = graphicsInfo->oam->shape;
     sprite->oam.size = graphicsInfo->oam->size;
@@ -1973,9 +2100,7 @@ static u8 GetOverworldCastformForm(void) {
     return CASTFORM_NORMAL;
 }
 
-// Retrieve graphic information about the following pokemon, if any
-static bool8 GetFollowerInfo(u16 *species, u8 *form, u8 *shiny) {
-    struct Pokemon *mon = GetFirstLiveMon();
+static bool8 GetMonInfo(struct Pokemon * mon, u16 *species, u8 *form, u8 *shiny) {
     if (!mon) {
         *species = SPECIES_NONE;
         *form = 0;
@@ -1997,8 +2122,12 @@ static bool8 GetFollowerInfo(u16 *species, u8 *form, u8 *shiny) {
     return TRUE;
 }
 
-void UpdateFollowingPokemon(void) {
-    // Update following pokemon if any
+// Retrieve graphic information about the following pokemon, if any
+static bool8 GetFollowerInfo(u16 *species, u8 *form, u8 *shiny) {
+    return GetMonInfo(GetFirstLiveMon(), species, form, shiny);
+}
+
+void UpdateFollowingPokemon(void) { // Update following pokemon if any
     struct ObjectEvent *objEvent = GetFollowerObject();
     struct Sprite *sprite;
     u16 species;
@@ -2020,13 +2149,15 @@ void UpdateFollowingPokemon(void) {
         u32 objId = gPlayerAvatar.objectEventId;
         struct ObjectEventTemplate template = {
             .localId = OBJ_EVENT_ID_FOLLOWER,
-            .graphicsId = OBJ_EVENT_GFX_OW_MON,
+            .graphicsId = OBJ_EVENT_GFX_MON_BASE + species,
             .flagId = 0,
             .x = gSaveBlock1Ptr->pos.x,
             .y = gSaveBlock1Ptr->pos.y,
             // If player active, copy player elevation
             .elevation = gObjectEvents[objId].active ? gObjectEvents[objId].currentElevation : 3,
             .movementType = MOVEMENT_TYPE_FOLLOW_PLAYER,
+            // store form info in template
+            .trainerRange_berryTreeId = (form & 0x1F) | (shiny << 5),
         };
         if ((objId = SpawnSpecialObjectEvent(&template)) >= OBJECT_EVENTS_COUNT)
             return;
@@ -2035,18 +2166,12 @@ void UpdateFollowingPokemon(void) {
     }
     sprite = &gSprites[objEvent->spriteId];
     // Follower appearance changed; move to player and set invisible
-    if (species != objEvent->extra.mon.species ||
-        shiny != objEvent->extra.mon.shiny ||
-        form != objEvent->extra.mon.form)
-    {
+    if (species != OW_SPECIES(objEvent) || shiny != objEvent->shiny || form != OW_FORM(objEvent)) {
         MoveObjectEventToMapCoords(objEvent, gObjectEvents[gPlayerAvatar.objectEventId].currentCoords.x, gObjectEvents[gPlayerAvatar.objectEventId].currentCoords.y);
+        FollowerSetGraphics(objEvent, species, form, shiny);
         objEvent->invisible = TRUE;
     }
-    FollowerSetGraphics(objEvent, species, form, shiny);
     sprite->data[6] = 0; // set animation data
-    objEvent->extra.mon.species = species;
-    objEvent->extra.mon.shiny = shiny;
-    objEvent->extra.mon.form = form;
 }
 
 // Remove follower object. Idempotent.
@@ -2125,7 +2250,12 @@ bool32 CheckMsgCondition(const struct MsgCondition *cond, struct Pokemon *mon, u
     switch (cond->type)
     {
     case MSG_COND_SPECIES:
-        return (cond->data.raw == species);
+        multi = cond->data.split.hw;
+        // if byte nonzero, invert; check != species!
+        if (cond->data.split.b)
+            return (cond->data.split.hw != species);
+        else
+            return (cond->data.split.hw == species);
     case MSG_COND_TYPE:
         multi = (SpeciesHasType(species, cond->data.bytes[0]) ||
                  SpeciesHasType(species, cond->data.bytes[1]));
@@ -2367,7 +2497,7 @@ void TrySpawnObjectEvents(s16 cameraX, s16 cameraY)
         s16 top = gSaveBlock1Ptr->pos.y;
         s16 bottom = gSaveBlock1Ptr->pos.y + MAP_OFFSET_H + 2;
 
-        if (InBattlePyramid())
+        if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
             objectCount = GetNumBattlePyramidObjectEvents();
         else if (InTrainerHill())
             objectCount = HILL_TRAINERS_PER_FLOOR;
@@ -2429,7 +2559,7 @@ static void RemoveObjectEventIfOutsideView(struct ObjectEvent *objectEvent)
 
 void SpawnObjectEventsOnReturnToField(s16 x, s16 y)
 {
-    u8 i;
+    u32 i;
 
     ClearPlayerAvatarInfo();
     for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
@@ -2442,7 +2572,7 @@ void SpawnObjectEventsOnReturnToField(s16 x, s16 y)
 
 static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
 {
-    u8 i;
+    u32 i;
     struct Sprite *sprite;
     struct ObjectEvent *objectEvent;
     struct SpriteTemplate spriteTemplate;
@@ -2459,16 +2589,24 @@ static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
     objectEvent = &gObjectEvents[objectEventId];
     subspriteTables = NULL;
     graphicsInfo = GetObjectEventGraphicsInfo(objectEvent->graphicsId);
-    spriteFrameImage.size = graphicsInfo->size;
     CopyObjectGraphicsInfoToSpriteTemplate_WithMovementType(objectEvent->graphicsId, objectEvent->movementType, &spriteTemplate, &subspriteTables);
+    spriteFrameImage.size = graphicsInfo->size;
     spriteTemplate.images = &spriteFrameImage;
-    if (spriteTemplate.paletteTag != TAG_NONE)
+    #if OW_GFX_COMPRESS
+    spriteTemplate.tileTag = LoadSheetGraphicsInfo(graphicsInfo, objectEvent->graphicsId, NULL);
+    #endif
+    if (spriteTemplate.paletteTag != TAG_NONE && spriteTemplate.paletteTag != OBJ_EVENT_PAL_TAG_DYNAMIC)
         LoadObjectEventPalette(spriteTemplate.paletteTag);
-    i = CreateSprite(&spriteTemplate, 0, 0, 0);
 
+    i = CreateSprite(&spriteTemplate, 0, 0, 0);
     if (i != MAX_SPRITES)
     {
         sprite = &gSprites[i];
+        // Use palette from species palette table
+        if (spriteTemplate.paletteTag == OBJ_EVENT_PAL_TAG_DYNAMIC)
+            sprite->oam.paletteNum = LoadDynamicFollowerPalette(OW_SPECIES(objectEvent), OW_FORM(objectEvent), objectEvent->shiny);
+        if (OW_GFX_COMPRESS && sprite->usingSheet)
+            sprite->sheetSpan = GetSpanPerImage(sprite->oam.shape, sprite->oam.size);
         GetMapCoordsFromSpritePos(x + objectEvent->currentCoords.x, y + objectEvent->currentCoords.y, &sprite->x, &sprite->y);
         sprite->centerToCornerVecX = -(graphicsInfo->width >> 1);
         sprite->centerToCornerVecY = -(graphicsInfo->height >> 1);
@@ -2486,10 +2624,6 @@ static void SpawnObjectEventOnReturnToField(u8 objectEventId, s16 x, s16 y)
         sprite->coordOffsetEnabled = TRUE;
         sprite->sObjEventId = objectEventId;
         objectEvent->spriteId = i;
-
-        if (objectEvent->graphicsId == OBJ_EVENT_GFX_OW_MON) // Set pokemon graphics
-            FollowerSetGraphics(objectEvent, objectEvent->extra.mon.species, objectEvent->extra.mon.form, objectEvent->extra.mon.shiny);
-
         if (!objectEvent->inanimate && objectEvent->movementType != MOVEMENT_TYPE_PLAYER)
             StartSpriteAnim(sprite, GetFaceDirectionAnimNum(objectEvent->facingDirection));
 
@@ -2544,8 +2678,12 @@ static void ObjectEventSetGraphics(struct ObjectEvent *objectEvent, const struct
         UpdateSpritePalette(&sObjectEventSpritePalettes[i], sprite);
 
     // If gfx size changes, we need to reallocate tiles
-    if (LARGE_OW_SUPPORT && graphicsInfo->oam->size != sprite->oam.size)
+    if (LARGE_OW_SUPPORT && !OW_GFX_COMPRESS && graphicsInfo->oam->size != sprite->oam.size)
         ReallocSpriteTiles(sprite, graphicsInfo->images->size);
+
+    #if OW_GFX_COMPRESS
+    LoadSheetGraphicsInfo(graphicsInfo, objectEvent->graphicsId, sprite);
+    #endif
 
     sprite->oam.shape = graphicsInfo->oam->shape;
     sprite->oam.size = graphicsInfo->oam->size;
@@ -2562,14 +2700,14 @@ static void ObjectEventSetGraphics(struct ObjectEvent *objectEvent, const struct
         CameraObjectReset();
 }
 
-void ObjectEventSetGraphicsId(struct ObjectEvent *objectEvent, u8 graphicsId)
+void ObjectEventSetGraphicsId(struct ObjectEvent *objectEvent, u16 graphicsId)
 {
     objectEvent->graphicsId = graphicsId;
     ObjectEventSetGraphics(objectEvent, GetObjectEventGraphicsInfo(graphicsId));
     objectEvent->graphicsId = graphicsId;
 }
 
-void ObjectEventSetGraphicsIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, u8 graphicsId)
+void ObjectEventSetGraphicsIdByLocalIdAndMap(u8 localId, u8 mapNum, u8 mapGroup, u16 graphicsId)
 {
     u8 objectEventId;
 
@@ -2601,7 +2739,7 @@ void PlayerObjectTurn(struct PlayerAvatar *playerAvatar, u8 direction)
 }
 
 static void SetBerryTreeGraphics(struct ObjectEvent *objectEvent, u8 berryId, u8 berryStage) {
-    const u8 graphicsId = gBerryTreeObjectEventGraphicsIdTablePointers[berryId][berryStage];
+    const u16 graphicsId = gBerryTreeObjectEventGraphicsIdTablePointers[berryId][berryStage];
     const struct ObjectEventGraphicsInfo *graphicsInfo = GetObjectEventGraphicsInfo(graphicsId);
     struct Sprite *sprite = &gSprites[objectEvent->spriteId];
     UpdateSpritePalette(&sObjectEventSpritePalettes[gBerryTreePaletteSlotTablePointers[berryId][berryStage]-2], sprite);
@@ -2643,18 +2781,27 @@ static void get_berry_tree_graphics(struct ObjectEvent *objectEvent, struct Spri
     }
 }
 
-const struct ObjectEventGraphicsInfo *GetObjectEventGraphicsInfo(u8 graphicsId)
+const struct ObjectEventGraphicsInfo *GetObjectEventGraphicsInfo(u16 graphicsId)
 {
-    u8 bard;
+    u32 form = 0;
 
-    if (graphicsId >= OBJ_EVENT_GFX_VARS)
+    if (graphicsId >= OBJ_EVENT_GFX_VARS && graphicsId <= OBJ_EVENT_GFX_VAR_F)
         graphicsId = VarGetObjectEventGraphicsId(graphicsId - OBJ_EVENT_GFX_VARS);
 
-    if (graphicsId == OBJ_EVENT_GFX_BARD)
-    {
-        bard = GetCurrentMauvilleOldMan();
-        return gMauvilleOldManGraphicsInfoPointers[bard];
+    // graphicsId may contain mon form info
+    if (graphicsId > OBJ_EVENT_GFX_SPECIES_MASK) {
+        form = graphicsId >> OBJ_EVENT_GFX_SPECIES_BITS;
+        graphicsId = graphicsId & OBJ_EVENT_GFX_SPECIES_MASK;
     }
+    if (graphicsId >= OBJ_EVENT_GFX_MON_BASE + SPECIES_SHINY_TAG)
+        graphicsId -= SPECIES_SHINY_TAG;
+
+    if (graphicsId == OBJ_EVENT_GFX_BARD) {
+        return gMauvilleOldManGraphicsInfoPointers[GetCurrentMauvilleOldMan()];
+    }
+
+    if (graphicsId >= OBJ_EVENT_GFX_MON_BASE)
+        return SpeciesToGraphicsInfo(graphicsId - OBJ_EVENT_GFX_MON_BASE, form);
 
     if (graphicsId >= NUM_OBJ_EVENT_GFX)
         graphicsId = OBJ_EVENT_GFX_NINJA_BOY;
@@ -2664,7 +2811,7 @@ const struct ObjectEventGraphicsInfo *GetObjectEventGraphicsInfo(u8 graphicsId)
 
 static void SetObjectEventDynamicGraphicsId(struct ObjectEvent *objectEvent)
 {
-    if (objectEvent->graphicsId >= OBJ_EVENT_GFX_VARS)
+    if (objectEvent->graphicsId >= OBJ_EVENT_GFX_VARS && objectEvent->graphicsId <= OBJ_EVENT_GFX_VAR_F)
         objectEvent->graphicsId = VarGetObjectEventGraphicsId(objectEvent->graphicsId - OBJ_EVENT_GFX_VARS);
 }
 
@@ -3316,12 +3463,20 @@ bool8 MovementType_WanderAround_Step2(struct ObjectEvent *objectEvent, struct Sp
     return TRUE;
 }
 
-bool8 MovementType_WanderAround_Step3(struct ObjectEvent *objectEvent, struct Sprite *sprite)
+// common; used by all MovementType_Wander*_Step3
+bool8 MovementType_Wander_Step3(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     if (WaitForMovementDelay(sprite))
     {
+        // resets a mid-movement sprite
+        ClearObjectEventMovement(objectEvent, sprite);
         sprite->sTypeFuncId = 4;
         return TRUE;
+    } else if (
+        OW_MON_WANDER_WALK == TRUE
+        && IS_OW_MON_OBJ(objectEvent))
+    {
+        UpdateMonMoveInPlace(objectEvent, sprite);
     }
     return FALSE;
 }
@@ -3648,16 +3803,6 @@ bool8 MovementType_WanderUpAndDown_Step2(struct ObjectEvent *objectEvent, struct
     return TRUE;
 }
 
-bool8 MovementType_WanderUpAndDown_Step3(struct ObjectEvent *objectEvent, struct Sprite *sprite)
-{
-    if (WaitForMovementDelay(sprite))
-    {
-        sprite->sTypeFuncId = 4;
-        return TRUE;
-    }
-    return FALSE;
-}
-
 bool8 MovementType_WanderUpAndDown_Step4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     u8 direction;
@@ -3714,16 +3859,6 @@ bool8 MovementType_WanderLeftAndRight_Step2(struct ObjectEvent *objectEvent, str
     SetMovementDelay(sprite, sMovementDelaysMedium[Random() % ARRAY_COUNT(sMovementDelaysMedium)]);
     sprite->sTypeFuncId = 3;
     return TRUE;
-}
-
-bool8 MovementType_WanderLeftAndRight_Step3(struct ObjectEvent *objectEvent, struct Sprite *sprite)
-{
-    if (WaitForMovementDelay(sprite))
-    {
-        sprite->sTypeFuncId = 4;
-        return TRUE;
-    }
-    return FALSE;
 }
 
 bool8 MovementType_WanderLeftAndRight_Step4(struct ObjectEvent *objectEvent, struct Sprite *sprite)
@@ -5084,12 +5219,13 @@ static bool32 EndFollowerTransformEffect(struct ObjectEvent *objectEvent, struct
 
 static bool32 TryStartFollowerTransformEffect(struct ObjectEvent *objectEvent, struct Sprite *sprite) {
     u32 multi;
-    if (objectEvent->extra.mon.species == SPECIES_CASTFORM && objectEvent->extra.mon.form != (multi = GetOverworldCastformForm())) {
+    if (OW_SPECIES(objectEvent) == SPECIES_CASTFORM && OW_FORM(objectEvent) != (multi = GetOverworldCastformForm())) {
         sprite->data[7] = TRANSFORM_TYPE_PERMANENT << 8;
-        objectEvent->extra.mon.form = multi;
+        objectEvent->graphicsId &= OBJ_EVENT_GFX_SPECIES_MASK;
+        objectEvent->graphicsId |= multi << OBJ_EVENT_GFX_SPECIES_BITS;
         return TRUE;
-    } else if ((gRngValue >> 16) < 18 && GetLocalWildMon(FALSE)
-            && (objectEvent->extra.mon.species == SPECIES_MEW || objectEvent->extra.mon.species == SPECIES_DITTO)) {
+    } else if ((Random() & 0xFFFF) < 18 && GetLocalWildMon(FALSE)
+            && (OW_SPECIES(objectEvent) == SPECIES_MEW || OW_SPECIES(objectEvent) == SPECIES_DITTO)) {
         sprite->data[7] = TRANSFORM_TYPE_RANDOM_WILD << 8;
         PlaySE(SE_M_MINIMIZE);
         return TRUE;
@@ -5119,15 +5255,15 @@ static bool8 UpdateFollowerTransformEffect(struct ObjectEvent *objectEvent, stru
             RefreshFollowerGraphics(objectEvent);
             break;
         case TRANSFORM_TYPE_RANDOM_WILD:
-            multi = objectEvent->extra.asU16;
-            objectEvent->extra.mon.species = GetLocalWildMon(FALSE);
-            if (!objectEvent->extra.mon.species) {
-                objectEvent->extra.asU16 = multi;
+            multi = objectEvent->graphicsId;
+            objectEvent->graphicsId = GetLocalWildMon(FALSE);
+            if (!objectEvent->graphicsId) {
+                objectEvent->graphicsId = multi;
                 break;
             }
-            objectEvent->extra.mon.form = 0;
+            objectEvent->graphicsId += OBJ_EVENT_GFX_MON_BASE;
             RefreshFollowerGraphics(objectEvent);
-            objectEvent->extra.asU16 = multi;
+            objectEvent->graphicsId = multi;
             break;
         }
     }
@@ -5179,7 +5315,7 @@ bool8 MovementType_FollowPlayer_Active(struct ObjectEvent *objectEvent, struct S
         // Animate entering pokeball
         ClearObjectEventMovement(objectEvent, sprite);
         ObjectEventSetSingleMovement(objectEvent, sprite, MOVEMENT_ACTION_ENTER_POKEBALL);
-        objectEvent->singleMovementActive = 1;
+        objectEvent->singleMovementActive = TRUE;
         sprite->sTypeFuncId = 2; // movement action sets state to 0
         return TRUE;
     }
@@ -5196,7 +5332,7 @@ bool8 MovementType_FollowPlayer_Moving(struct ObjectEvent *objectEvent, struct S
     #else
     if (ObjectEventExecSingleMovementAction(objectEvent, sprite)) {
     #endif
-        objectEvent->singleMovementActive = 0;
+        objectEvent->singleMovementActive = FALSE;
         objectEvent->facingDirectionLocked = FALSE;
         if (sprite->sTypeFuncId) // restore nonzero state
             sprite->sTypeFuncId = 1;
@@ -5208,19 +5344,27 @@ bool8 MovementType_FollowPlayer_Moving(struct ObjectEvent *objectEvent, struct S
     return FALSE;
 }
 
-bool8 FollowablePlayerMovement_Idle(struct ObjectEvent *objectEvent, struct Sprite *sprite, u8 playerDirection, bool8 tileCallback(u8))
-{
+// single function for updating an OW mon's walk-in-place movements
+static bool32 UpdateMonMoveInPlace(struct ObjectEvent *objectEvent, struct Sprite *sprite) {
     if (!objectEvent->singleMovementActive) {
         // walk in place
-      ObjectEventSetSingleMovement(objectEvent, sprite, GetWalkInPlaceNormalMovementAction(objectEvent->facingDirection));
-      sprite->sTypeFuncId = 1;
-      objectEvent->singleMovementActive = 1;
-      return TRUE;
+        ObjectEventSetSingleMovement(objectEvent, sprite, GetWalkInPlaceNormalMovementAction(objectEvent->facingDirection));
+        objectEvent->singleMovementActive = TRUE;
+        return TRUE;
     } else if (ObjectEventExecSingleMovementAction(objectEvent, sprite)) {
         // finish movement action
-        objectEvent->singleMovementActive = 0;
+        objectEvent->singleMovementActive = FALSE;
     } else if (OW_MON_BOBBING == TRUE && (sprite->data[3] & 7) == 2)
         sprite->y2 ^= -1;
+    return FALSE;
+}
+
+bool8 FollowablePlayerMovement_Idle(struct ObjectEvent *objectEvent, struct Sprite *sprite, u8 playerDirection, bool8 tileCallback(u8))
+{
+    if (UpdateMonMoveInPlace(objectEvent, sprite)) {
+        sprite->sTypeFuncId = 1;
+        return TRUE;
+    }
     UpdateFollowerTransformEffect(objectEvent, sprite);
     return FALSE;
 }
@@ -5255,7 +5399,7 @@ bool8 FollowablePlayerMovement_Step(struct ObjectEvent *objectEvent, struct Spri
         }
         MoveObjectEventToMapCoords(objectEvent, targetX, targetY);
         ObjectEventSetSingleMovement(objectEvent, sprite, MOVEMENT_ACTION_EXIT_POKEBALL);
-        objectEvent->singleMovementActive = 1;
+        objectEvent->singleMovementActive = TRUE;
         sprite->sTypeFuncId = 2;
         if (OW_MON_BOBBING == TRUE)
             sprite->y2 = 0;
@@ -5298,7 +5442,7 @@ bool8 FollowablePlayerMovement_Step(struct ObjectEvent *objectEvent, struct Spri
             sprite->y2 = -1;
     }
     sprite->sActionFuncId = 0;
-    objectEvent->singleMovementActive = 1;
+    objectEvent->singleMovementActive = TRUE;
     sprite->sTypeFuncId = 2;
     return TRUE;
 }
@@ -5480,6 +5624,14 @@ bool8 MovementType_MoveInPlace_Step1(struct ObjectEvent *objectEvent, struct Spr
 {
     if (ObjectEventExecSingleMovementAction(objectEvent, sprite))
         sprite->sTypeFuncId = 0;
+    // similar to UpdateMonMoveInPlace
+    else if (
+        OW_MON_BOBBING == TRUE
+        && IS_OW_MON_OBJ(objectEvent)
+        && (sprite->data[3] & 7) == 2)
+    {
+        sprite->y2 ^= 1;
+    }
     return FALSE;
 }
 
@@ -5738,7 +5890,7 @@ void SetTrainerMovementType(struct ObjectEvent *objectEvent, u8 movementType)
 {
     objectEvent->movementType = movementType;
     objectEvent->directionSequenceIndex = 0;
-    objectEvent->extra.playerCopyableMovement = 0;
+    objectEvent->playerCopyableMovement = 0;
     gSprites[objectEvent->spriteId].callback = sMovementTypeCallbacks[movementType];
     gSprites[objectEvent->spriteId].sTypeFuncId = 0;
 }
@@ -5794,18 +5946,18 @@ static bool8 IsCoordOutsideObjectEventMovementRange(struct ObjectEvent *objectEv
     s16 top;
     s16 bottom;
 
-    if (objectEvent->rangeX != 0)
+    if (objectEvent->range.rangeX != 0)
     {
-        left = objectEvent->initialCoords.x - objectEvent->rangeX;
-        right = objectEvent->initialCoords.x + objectEvent->rangeX;
+        left = objectEvent->initialCoords.x - objectEvent->range.rangeX;
+        right = objectEvent->initialCoords.x + objectEvent->range.rangeX;
 
         if (left > x || right < x)
             return TRUE;
     }
-    if (objectEvent->rangeY != 0)
+    if (objectEvent->range.rangeY != 0)
     {
-        top = objectEvent->initialCoords.y - objectEvent->rangeY;
-        bottom = objectEvent->initialCoords.y + objectEvent->rangeY;
+        top = objectEvent->initialCoords.y - objectEvent->range.rangeY;
+        bottom = objectEvent->initialCoords.y + objectEvent->range.rangeY;
 
         if (top > y || bottom < y)
             return TRUE;
@@ -6010,7 +6162,7 @@ bool8 ObjectEventSetHeldMovement(struct ObjectEvent *objectEvent, u8 movementAct
         objectEvent->isPlayer &&
         FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT))
     {
-        objectEvent->extra.playerCopyableMovement = sActionIdToCopyableMovement[objectEvent->movementActionId];
+        objectEvent->playerCopyableMovement = sActionIdToCopyableMovement[objectEvent->movementActionId];
     }
 
     return FALSE;
@@ -6042,7 +6194,7 @@ void ObjectEventClearHeldMovement(struct ObjectEvent *objectEvent)
         objectEvent->isPlayer &&
         FlagGet(FLAG_SAFE_FOLLOWER_MOVEMENT))
     {
-        objectEvent->extra.playerCopyableMovement = sActionIdToCopyableMovement[objectEvent->movementActionId];
+        objectEvent->playerCopyableMovement = sActionIdToCopyableMovement[objectEvent->movementActionId];
     }
 }
 
@@ -6922,6 +7074,7 @@ static void ObjectEventSetPokeballGfx(struct ObjectEvent *objEvent) {
 
 bool8 MovementAction_ExitPokeball_Step0(struct ObjectEvent *objectEvent, struct Sprite *sprite) {
     u32 direction = gObjectEvents[gPlayerAvatar.objectEventId].facingDirection;
+    u16 graphicsId = objectEvent->graphicsId;
     objectEvent->invisible = FALSE;
     if (TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_DASH)) { // If player is dashing, the pokemon must come out faster
         StartSpriteAnimInDirection(objectEvent, sprite, direction, GetJumpSpecialDirectionAnimNum(direction));
@@ -6936,6 +7089,7 @@ bool8 MovementAction_ExitPokeball_Step0(struct ObjectEvent *objectEvent, struct 
     if (direction == DIR_EAST && sprite->anims[ANIM_STD_FACE_EAST]->frame.hFlip)
         sprite->sSpeedFlip |= 1 << 4;
     ObjectEventSetPokeballGfx(objectEvent);
+    objectEvent->graphicsId = graphicsId;
     objectEvent->inanimate = FALSE;
     return MovementAction_ExitPokeball_Step1(objectEvent, sprite);
 }
@@ -6996,7 +7150,7 @@ bool8 MovementAction_ExitPokeball_Step1(struct ObjectEvent *objectEvent, struct 
         return TRUE;
     // Set graphics, palette, and affine animation
     } else if (sprite->sDuration == animStepFrame) {
-        FollowerSetGraphics(objectEvent, objectEvent->extra.mon.species, objectEvent->extra.mon.form, objectEvent->extra.mon.shiny);
+        FollowerSetGraphics(objectEvent, OW_SPECIES(objectEvent), OW_FORM(objectEvent), objectEvent->shiny);
         LoadFillColorPalette(RGB_WHITE, OBJ_EVENT_PAL_TAG_WHITE, sprite);
         // Initialize affine animation
         sprite->affineAnims = sAffineAnims_PokeballFollower;
@@ -7011,7 +7165,7 @@ bool8 MovementAction_ExitPokeball_Step1(struct ObjectEvent *objectEvent, struct 
         sprite->affineAnimEnded = TRUE;
         FreeSpriteOamMatrix(sprite);
         sprite->oam.affineMode = ST_OAM_AFFINE_OFF;
-        FollowerSetGraphics(objectEvent, objectEvent->extra.mon.species, objectEvent->extra.mon.form, objectEvent->extra.mon.shiny);
+        FollowerSetGraphics(objectEvent, OW_SPECIES(objectEvent), OW_FORM(objectEvent), objectEvent->shiny);
     }
     return FALSE;
 }
@@ -7031,6 +7185,7 @@ bool8 MovementAction_EnterPokeball_Step0(struct ObjectEvent *objectEvent, struct
 
 bool8 MovementAction_EnterPokeball_Step1(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
+    u16 graphicsId = objectEvent->graphicsId;
     if (--sprite->sDuration == 0) {
         sprite->sActionFuncId = 2;
         return FALSE;
@@ -7050,6 +7205,7 @@ bool8 MovementAction_EnterPokeball_Step1(struct ObjectEvent *objectEvent, struct
         FreeSpriteOamMatrix(sprite);
         sprite->oam.affineMode = ST_OAM_AFFINE_OFF;
         ObjectEventSetPokeballGfx(objectEvent);
+        objectEvent->graphicsId = graphicsId;
         objectEvent->inanimate = FALSE;
     }
     return FALSE;
@@ -7057,7 +7213,7 @@ bool8 MovementAction_EnterPokeball_Step1(struct ObjectEvent *objectEvent, struct
 
 bool8 MovementAction_EnterPokeball_Step2(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
-    FollowerSetGraphics(objectEvent, objectEvent->extra.mon.species, objectEvent->extra.mon.form, objectEvent->extra.mon.shiny);
+    FollowerSetGraphics(objectEvent, OW_SPECIES(objectEvent), OW_FORM(objectEvent), objectEvent->shiny);
     objectEvent->invisible = TRUE;
     sprite->sTypeFuncId = 0;
     sprite->sSpeedFlip = 0;
@@ -7515,7 +7671,7 @@ bool8 MovementAction_FacePlayer_Step0(struct ObjectEvent *objectEvent, struct Sp
 {
     u8 playerObjectId;
 
-    if (!TryGetObjectEventIdByLocalIdAndMap(OBJ_EVENT_ID_PLAYER, 0, 0, &playerObjectId))
+    if (!TryGetObjectEventIdByLocalIdAndMap(LOCALID_PLAYER, 0, 0, &playerObjectId))
         FaceDirection(objectEvent, sprite, GetDirectionToFace(objectEvent->currentCoords.x,
                                                               objectEvent->currentCoords.y,
                                                               gObjectEvents[playerObjectId].currentCoords.x,
@@ -7528,7 +7684,7 @@ bool8 MovementAction_FaceAwayPlayer_Step0(struct ObjectEvent *objectEvent, struc
 {
     u8 playerObjectId;
 
-    if (!TryGetObjectEventIdByLocalIdAndMap(OBJ_EVENT_ID_PLAYER, 0, 0, &playerObjectId))
+    if (!TryGetObjectEventIdByLocalIdAndMap(LOCALID_PLAYER, 0, 0, &playerObjectId))
         FaceDirection(objectEvent, sprite, GetOppositeDirection(GetDirectionToFace(objectEvent->currentCoords.x,
                                                                                    objectEvent->currentCoords.y,
                                                                                    gObjectEvents[playerObjectId].currentCoords.x,
@@ -9230,13 +9386,13 @@ static void (*const sGroundEffectTracksFuncs[])(struct ObjectEvent *objEvent, st
 
 void GroundEffect_SandTracks(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
-    const struct ObjectEventGraphicsInfo *info = objEvent->graphicsId == OBJ_EVENT_GFX_OW_MON ? SpeciesToGraphicsInfo(objEvent->extra.mon.species, 0) : GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    const struct ObjectEventGraphicsInfo *info = GetObjectEventGraphicsInfo(objEvent->graphicsId);
     sGroundEffectTracksFuncs[objEvent->invisible ? TRACKS_NONE : info->tracks](objEvent, sprite, FALSE);
 }
 
 void GroundEffect_DeepSandTracks(struct ObjectEvent *objEvent, struct Sprite *sprite)
 {
-    const struct ObjectEventGraphicsInfo *info = objEvent->graphicsId == OBJ_EVENT_GFX_OW_MON ? SpeciesToGraphicsInfo(objEvent->extra.mon.species, 0) : GetObjectEventGraphicsInfo(objEvent->graphicsId);
+    const struct ObjectEventGraphicsInfo *info = GetObjectEventGraphicsInfo(objEvent->graphicsId);
     sGroundEffectTracksFuncs[objEvent->invisible ? TRACKS_NONE : info->tracks](objEvent, sprite, TRUE);
 }
 
@@ -9968,14 +10124,16 @@ static u8 DoJumpSpecialSpriteMovement(struct Sprite *sprite)
 
 static void SetMovementDelay(struct Sprite *sprite, s16 timer)
 {
-    sprite->data[3] = timer;
+    sprite->data[3] = timer; // kept for legacy reasons
+    sprite->data[7] = timer; // actual timer
 }
 
 static bool8 WaitForMovementDelay(struct Sprite *sprite)
 {
-    if (--sprite->data[3] == 0)
+    if (--sprite->data[7] == 0) {
+        sprite->data[3] = 0; // reset animation timer
         return TRUE;
-    else
+    } else
         return FALSE;
 }
 
@@ -10065,7 +10223,7 @@ void TurnVirtualObject(u8 virtualObjId, u8 direction)
         StartSpriteAnim(&gSprites[spriteId], GetFaceDirectionAnimNum(direction));
 }
 
-void SetVirtualObjectGraphics(u8 virtualObjId, u8 graphicsId)
+void SetVirtualObjectGraphics(u8 virtualObjId, u16 graphicsId)
 {
     int spriteId = GetVirtualObjectSpriteId(virtualObjId);
 
@@ -10262,7 +10420,7 @@ u8 MovementAction_LockAnim_Step0(struct ObjectEvent *objectEvent, struct Sprite 
         bool32 found = FALSE;
         for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
         {
-            if (firstFreeSlot == OBJECT_EVENTS_COUNT && sLockedAnimObjectEvents->localIds[i] == 0)
+            if (firstFreeSlot == OBJECT_EVENTS_COUNT && sLockedAnimObjectEvents->localIds[i] == LOCALID_NONE)
                 firstFreeSlot = i;
 
             if (sLockedAnimObjectEvents->localIds[i] == objectEvent->localId)
@@ -10302,7 +10460,7 @@ u8 MovementAction_UnlockAnim_Step0(struct ObjectEvent *objectEvent, struct Sprit
         index = FindLockedObjectEventIndex(objectEvent);
         if (index != OBJECT_EVENTS_COUNT)
         {
-            sLockedAnimObjectEvents->localIds[index] = 0;
+            sLockedAnimObjectEvents->localIds[index] = LOCALID_NONE;
             sLockedAnimObjectEvents->count--;
             ableToStore = TRUE;
         }
@@ -10417,4 +10575,26 @@ u8 MovementAction_FlyDown_Step1(struct ObjectEvent *objectEvent, struct Sprite *
 u8 MovementAction_Fly_Finish(struct ObjectEvent *objectEvent, struct Sprite *sprite)
 {
     return TRUE;
+}
+
+// Get gfx data from daycare pokemon and store it in vars
+bool8 ScrFunc_getdaycaregfx(struct ScriptContext *ctx) {
+    u16 varGfx[] = {ScriptReadHalfword(ctx), ScriptReadHalfword(ctx)};
+    u16 varForm[] = {ScriptReadHalfword(ctx), ScriptReadHalfword(ctx)};
+    u16 specGfx;
+    u8 form;
+    u8 shiny;
+    s32 i;
+    for (i = 0; i < 2; i++) {
+        GetMonInfo((struct Pokemon *) &gSaveBlock1Ptr->daycare.mons[i].mon, &specGfx, &form, &shiny);
+        if (specGfx == SPECIES_NONE)
+            break;
+        // Assemble gfx ID like FollowerSetGraphics
+        specGfx = (OBJ_EVENT_GFX_MON_BASE + specGfx) & OBJ_EVENT_GFX_SPECIES_MASK;
+        specGfx |= form << OBJ_EVENT_GFX_SPECIES_BITS;
+        VarSet(varGfx[i], specGfx);
+        VarSet(varForm[i], form | (shiny << 5));
+    }
+    gSpecialVar_Result = i;
+    return FALSE;
 }

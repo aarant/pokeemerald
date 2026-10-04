@@ -29,9 +29,9 @@
 //   determined by the data for the corresponding MAPSEC in gRegionMapEntries.
 
 // Only maps in the following map groups have their encounters considered for the area screen
-#define MAP_GROUP_TOWNS_AND_ROUTES MAP_GROUP(PETALBURG_CITY)
-#define MAP_GROUP_DUNGEONS MAP_GROUP(METEOR_FALLS_1F_1R)
-#define MAP_GROUP_SPECIAL_AREA MAP_GROUP(SAFARI_ZONE_NORTHWEST)
+#define MAP_GROUP_TOWNS_AND_ROUTES MAP_GROUP(MAP_PETALBURG_CITY)
+#define MAP_GROUP_DUNGEONS MAP_GROUP(MAP_METEOR_FALLS_1F_1R)
+#define MAP_GROUP_SPECIAL_AREA MAP_GROUP(MAP_SAFARI_ZONE_NORTHWEST)
 
 #define AREA_SCREEN_WIDTH 32
 #define AREA_SCREEN_HEIGHT 20
@@ -58,7 +58,7 @@ struct OverworldArea
 {
     u8 mapGroup;
     u8 mapNum;
-    u16 regionMapSectionId;
+    mapsec_u16_t regionMapSectionId;
 };
 
 struct
@@ -79,7 +79,7 @@ struct
     /*0x61C*/ u16 areaShadeBldArgHi;
     /*0x61E*/ bool8 showingMarkers;
     /*0x61F*/ u8 markerFlashCounter;
-    /*0x620*/ u16 specialAreaRegionMapSectionIds[MAX_AREA_MARKERS];
+    /*0x620*/ mapsec_u16_t specialAreaRegionMapSectionIds[MAX_AREA_MARKERS];
     /*0x660*/ struct Sprite *areaMarkerSprites[MAX_AREA_MARKERS];
     /*0x6E0*/ u16 numAreaMarkerSprites;
     /*0x6E2*/ u16 alteringCaveCounter;
@@ -87,7 +87,7 @@ struct
     /*0x6E8*/ u8 *screenSwitchState;
     /*0x6EC*/ struct RegionMap regionMap;
     /*0xF70*/ u8 charBuffer[64];
-    /*0xFB0*/ struct Sprite * areaUnknownSprites[3];
+    /*0xFB0*/ struct Sprite *areaUnknownSprites[3];
     /*0xFBC*/ u8 areaUnknownGraphicsBuffer[0x600];
 } static EWRAM_DATA *sPokedexAreaScreen = NULL;
 
@@ -95,7 +95,7 @@ static void FindMapsWithMon(u16);
 static void BuildAreaGlowTilemap(void);
 static void SetAreaHasMon(u16, u16);
 static void SetSpecialMapHasMon(u16, u16);
-static u16 GetRegionMapSectionId(u8, u8);
+static mapsec_u16_t GetRegionMapSectionId(u8, u8);
 static bool8 MapHasSpecies(const struct WildPokemonHeader *, u16);
 static bool8 MonListHasSpecies(const struct WildPokemonInfo *, u16, u16);
 static void DoAreaGlow(void);
@@ -112,7 +112,7 @@ static const u32 sAreaGlow_Gfx[] = INCBIN_U32("graphics/pokedex/area_glow.4bpp.l
 
 static const u16 sSpeciesHiddenFromAreaScreen[] = { SPECIES_WYNAUT };
 
-static const u16 sMovingRegionMapSections[3] =
+static const mapsec_u16_t sMovingRegionMapSections[3] =
 {
     MAPSEC_MARINE_CAVE,
     MAPSEC_UNDERWATER_MARINE_CAVE,
@@ -121,11 +121,11 @@ static const u16 sMovingRegionMapSections[3] =
 
 static const u16 sFeebasData[][3] =
 {
-    {SPECIES_FEEBAS, MAP_GROUP(ROUTE119), MAP_NUM(ROUTE119)},
+    {SPECIES_FEEBAS, MAP_GROUP(MAP_ROUTE119), MAP_NUM(MAP_ROUTE119)},
     {NUM_SPECIES}
 };
 
-static const u16 sLandmarkData[][2] =
+static const mapsec_u16_t sLandmarkData[][2] =
 {
     {MAPSEC_SKY_PILLAR,       FLAG_LANDMARK_SKY_PILLAR},
     {MAPSEC_SEAFLOOR_CAVERN,  FLAG_LANDMARK_SEAFLOOR_CAVERN},
@@ -285,7 +285,7 @@ static void FindMapsWithMon(u16 species)
         }
 
         // Add regular species to the area map
-        for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(UNDEFINED); i++)
+        for (i = 0; gWildMonHeaders[i].mapGroup != MAP_GROUP(MAP_UNDEFINED); i++)
         {
             if (MapHasSpecies(&gWildMonHeaders[i], species))
             {
@@ -336,7 +336,7 @@ static void SetSpecialMapHasMon(u16 mapGroup, u16 mapNum)
 
     if (sPokedexAreaScreen->numSpecialAreas < MAX_AREA_MARKERS)
     {
-        u16 regionMapSectionId = GetRegionMapSectionId(mapGroup, mapNum);
+        mapsec_u16_t regionMapSectionId = GetRegionMapSectionId(mapGroup, mapNum);
         if (regionMapSectionId < MAPSEC_NONE)
         {
             // Don't highlight the area if it's a moving area (Marine/Terra Cave)
@@ -370,7 +370,7 @@ static void SetSpecialMapHasMon(u16 mapGroup, u16 mapNum)
     }
 }
 
-static u16 GetRegionMapSectionId(u8 mapGroup, u8 mapNum)
+static mapsec_u16_t GetRegionMapSectionId(u8 mapGroup, u8 mapNum)
 {
     return Overworld_GetMapHeaderByGroupAndId(mapGroup, mapNum)->regionMapSectionId;
 }
@@ -710,7 +710,7 @@ static void CreateAreaMarkerSprites(void)
     static s16 x;
     static s16 y;
     static s16 i;
-    static s16 mapSecId;
+    static mapsec_s16_t mapSecId;
     static s16 numSprites;
 
     LoadSpriteSheet(&sAreaMarkerSpriteSheet);

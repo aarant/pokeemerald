@@ -208,7 +208,7 @@ const u8 gTowerFemaleFacilityClasses[20] =
     FACILITY_CLASS_LASS
 };
 
-const u8 gTowerMaleTrainerGfxIds[30] =
+const u16 gTowerMaleTrainerGfxIds[30] =
 {
     OBJ_EVENT_GFX_HIKER,
     OBJ_EVENT_GFX_TUBER_M,
@@ -242,7 +242,7 @@ const u8 gTowerMaleTrainerGfxIds[30] =
     OBJ_EVENT_GFX_HIKER
 };
 
-const u8 gTowerFemaleTrainerGfxIds[20] =
+const u16 gTowerFemaleTrainerGfxIds[20] =
 {
     OBJ_EVENT_GFX_WOMAN_2,
     OBJ_EVENT_GFX_TUBER_F,
@@ -799,7 +799,7 @@ struct
 
 #include "data/battle_frontier/battle_tent.h"
 
-static void (* const sBattleTowerFuncs[])(void) =
+static void (*const sBattleTowerFuncs[])(void) =
 {
     [BATTLE_TOWER_FUNC_INIT]                = InitTowerChallenge,
     [BATTLE_TOWER_FUNC_GET_DATA]            = GetTowerData,
@@ -1255,11 +1255,11 @@ void SetEReaderTrainerGfxId(void)
     SetBattleFacilityTrainerGfxId(TRAINER_EREADER, 0);
 }
 
-u8 GetBattleFacilityTrainerGfxId(u16 trainerId)
+u16 GetBattleFacilityTrainerGfxId(u16 trainerId)
 {
     u32 i;
     u8 facilityClass;
-    u8 trainerObjectGfxId;
+    u16 trainerObjectGfxId;
 
     SetFacilityPtrsGetLevel();
     if (trainerId == TRAINER_EREADER)
@@ -2417,7 +2417,7 @@ static void LoadMultiPartnerCandidatesData(void)
 
 static void GetPotentialPartnerMoveAndSpecies(u16 trainerId, u16 monId)
 {
-    u16 move = 0;
+    u16 move = MOVE_NONE;
     u16 species = 0;
     SetFacilityPtrsGetLevel();
 
@@ -3467,9 +3467,9 @@ static void FillTentTrainerParty_(u16 trainerId, u8 firstMonId, u8 monCount)
     }
 }
 
-u8 FacilityClassToGraphicsId(u8 facilityClass)
+u16 FacilityClassToGraphicsId(u8 facilityClass)
 {
-    u8 trainerObjectGfxId;
+    u16 trainerObjectGfxId;
     u8 i;
 
     // Search male classes.
