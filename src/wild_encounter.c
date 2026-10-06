@@ -647,8 +647,9 @@ bool8 StandardWildEncounter(u16 curMetatileBehavior, u16 prevMetatileBehavior)
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS)
         {
-            monsInfo = night && gBattlePikeWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePikeWildMonHeaders[headerId].landMonsNightInfo : gBattlePikeWildMonHeaders[headerId].landMonsInfo;
             headerId = GetBattlePikeWildMonHeaderId();
+            monsInfo = night && gBattlePikeWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePikeWildMonHeaders[headerId].landMonsNightInfo : gBattlePikeWildMonHeaders[headerId].landMonsInfo;
+
             if (prevMetatileBehavior != curMetatileBehavior && !AllowWildCheckOnNewMetatile())
                 return FALSE;
             else if (WildEncounterCheck(monsInfo->encounterRate, FALSE) != TRUE)
@@ -663,8 +664,9 @@ bool8 StandardWildEncounter(u16 curMetatileBehavior, u16 prevMetatileBehavior)
         }
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
         {
-            monsInfo = night && gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo : gBattlePyramidWildMonHeaders[headerId].landMonsInfo;
             headerId = gSaveBlock2Ptr->frontier.curChallengeBattleNum;
+            monsInfo = night && gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo : gBattlePyramidWildMonHeaders[headerId].landMonsInfo;
+
             if (prevMetatileBehavior != curMetatileBehavior && !AllowWildCheckOnNewMetatile())
                 return FALSE;
             else if (WildEncounterCheck(monsInfo->encounterRate, FALSE) != TRUE)
@@ -793,8 +795,9 @@ bool8 SweetScentWildEncounter(void)
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PIKE_ROOM_WILD_MONS)
         {
-            monsInfo = night && gBattlePikeWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePikeWildMonHeaders[headerId].landMonsNightInfo : gBattlePikeWildMonHeaders[headerId].landMonsInfo;
             headerId = GetBattlePikeWildMonHeaderId();
+            monsInfo = night && gBattlePikeWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePikeWildMonHeaders[headerId].landMonsNightInfo : gBattlePikeWildMonHeaders[headerId].landMonsInfo;
+
             if (TryGenerateWildMon(monsInfo, WILD_AREA_LAND, 0) != TRUE)
                 return FALSE;
 
@@ -804,8 +807,9 @@ bool8 SweetScentWildEncounter(void)
         }
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_FLOOR)
         {
-            monsInfo = night && gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo : gBattlePyramidWildMonHeaders[headerId].landMonsInfo;
             headerId = gSaveBlock2Ptr->frontier.curChallengeBattleNum;
+            monsInfo = night && gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo != NULL ? gBattlePyramidWildMonHeaders[headerId].landMonsNightInfo : gBattlePyramidWildMonHeaders[headerId].landMonsInfo;
+
             if (TryGenerateWildMon(monsInfo, WILD_AREA_LAND, 0) != TRUE)
                 return FALSE;
 
