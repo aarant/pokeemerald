@@ -130,7 +130,7 @@ void SetSpritePosToOffsetMapCoords(s16 *x, s16 *y, s16 dx, s16 dy);
 void ClearObjectEventMovement(struct ObjectEvent *objectEvent, struct Sprite *sprite);
 void ObjectEventClearHeldMovement(struct ObjectEvent *objectEvent);
 void ObjectEventClearHeldMovementIfActive(struct ObjectEvent *objectEvent);
-struct Pokemon * GetFirstLiveMon(void);
+struct Pokemon * GetFirstLiveFollowMon(void);
 void UpdateFollowingPokemon(void);
 void RemoveFollowingPokemon(void);
 struct ObjectEvent * GetFollowerObject(void);

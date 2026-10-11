@@ -36,8 +36,8 @@ There are several branches, each with one main feature (and sometimes some extra
 **icons-followers** branch:
 * Has both **icons** and **followers-expanded-id**
 
-**lighting** branch:
-* Everything from the **followers** branch.
+**lighting-expanded-id** branch:
+* Everything from the **followers-expanded-id** branch.
 * Day/night shading compatible with weather.
 * GSC-style window lights.
 * WIP interframe-blended lamp lights at night, i.e in Rustboro.
@@ -52,17 +52,19 @@ There are several branches, each with one main feature (and sometimes some extra
 
 > Note: Unless you have a specific need for it, you should probably use `followers-expanded-id` over this.
 
-Additional branches to mention:
-
-* `lighting-expanded-id` - like the above but for `lighting`.
-
-To set up the repository, see [INSTALL.md](INSTALL.md).
-
 **guillotine** branch:
 * ~~Decapitates~~ Decapitalizes **all** text at runtime, with some exceptions (see the [FAQ](#guillotine-q-how-can-i-keep-my-strings-from-being-decapped))
 * Future-proof, does not require mass-replacing strings
 
 To set up the repository, see [INSTALL.md](INSTALL.md).
+
+When merging this README, to keep whatever you have there:
+
+```bash
+# git merge ...
+# Conflict !!
+git checkout --ours README.md
+```
 
 ## FAQ
 ### `(followers*)` Q: Where are the config settings?
@@ -142,6 +144,20 @@ See also the configuration in [text.h](gflib/text.h).
 There's also special handling for "separated bigrams"; basically, two letter words.
 This includes: `"TM01", "PC", "EV"`, any two uppercase characters surrounded by digits, whitespace, or the start/end of a string. These will not be decapped.
 
+### Q: AI policy?
+
+No AI was used in the making of my branches; all of my work is entirely organic.
+Please do not open Issues or PRs unless you can say the same of all text and code within them.
+
+**Please ask for permission** before using any of these branches for a project outside the `pokeemerald` ecosystem.
+If your project is not a fork of `pokeemerald` or does not run on the GBA, ask first.
+
+**Please ask for permission** before using any of these branches in a project reliant on AI assistance.
+
 ## See also
 
 For contacts and other pret projects, see [pret.github.io](https://pret.github.io/).
+
+Feel free to open an [Issue](https://github.com/aarant/pokeemerald/issues/new) on this repo.
+
+To contact me on Discord: **merrp**.

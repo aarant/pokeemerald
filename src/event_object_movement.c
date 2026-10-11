@@ -1940,13 +1940,13 @@ u8 CreateVirtualObject(u16 graphicsId, u8 virtualObjId, s16 x, s16 y, u8 elevati
     return spriteId;
 }
 
-struct Pokemon *GetFirstLiveMon(void) { // Return address of first conscious party mon or NULL
+struct Pokemon *GetFirstLiveFollowMon(void) { // Return address of first conscious party follow mon or NULL
     u32 i;
     for (i = 0; i < PARTY_SIZE; i++) {
         struct Pokemon *mon = &gPlayerParty[i];
         if ((OW_MON_ALLOWED_SPECIES && GetMonData(mon, MON_DATA_SPECIES_OR_EGG) != VarGet(OW_MON_ALLOWED_SPECIES))
             || (OW_MON_ALLOWED_MET_LVL && GetMonData(mon, MON_DATA_MET_LEVEL) != VarGet(OW_MON_ALLOWED_MET_LVL))
-            || (OW_MON_ALLOWED_MET_LOC && GetMonData(mon, MON_DATA_MET_LOCATION) != VarGet(OW_MON_ALLOWED_MET_LOC))
+            || (OW_MON_ALLOWED_MET_LOC != MAPSEC_COUNT && GetMonData(mon, MON_DATA_MET_LOCATION) != VarGet(OW_MON_ALLOWED_MET_LOC))
         ) {
             continue;
         }
@@ -2124,7 +2124,7 @@ static bool8 GetMonInfo(struct Pokemon * mon, u16 *species, u8 *form, u8 *shiny)
 
 // Retrieve graphic information about the following pokemon, if any
 static bool8 GetFollowerInfo(u16 *species, u8 *form, u8 *shiny) {
-    return GetMonInfo(GetFirstLiveMon(), species, form, shiny);
+    return GetMonInfo(GetFirstLiveFollowMon(), species, form, shiny);
 }
 
 void UpdateFollowingPokemon(void) { // Update following pokemon if any
@@ -2327,7 +2327,7 @@ bool8 ScrFunc_getfolloweraction(struct ScriptContext *ctx) // Essentially a big 
     u32 condCount = 0;
     u32 emotion;
     struct ObjectEvent *objEvent = GetFollowerObject();
-    struct Pokemon *mon = GetFirstLiveMon();
+    struct Pokemon *mon = GetFirstLiveFollowMon();
     u8 emotion_weight[FOLLOWER_EMOTION_LENGTH] = {
         [FOLLOWER_EMOTION_HAPPY] = 10,
         [FOLLOWER_EMOTION_NEUTRAL] = 15,
@@ -5874,7 +5874,7 @@ bool8 ScrFunc_GetDirectionToFace(struct ScriptContext *ctx) {
 bool8 ScrFunc_IsFollowerFieldMoveUser(struct ScriptContext *ctx) {
     u16 *var = GetVarPointer(ScriptReadHalfword(ctx));
     u16 userIndex = gFieldEffectArguments[0]; // field move user index
-    struct Pokemon *follower = GetFirstLiveMon();
+    struct Pokemon *follower = GetFirstLiveFollowMon();
     struct ObjectEvent *obj = GetFollowerObject();
     if (var == NULL)
         return FALSE;
@@ -7053,7 +7053,7 @@ static void ObjectEventSetPokeballGfx(struct ObjectEvent *objEvent) {
     #if OW_MON_POKEBALLS
     u32 ball = BALL_POKE;
     if (objEvent->localId == OBJ_EVENT_ID_FOLLOWER) {
-        struct Pokemon *mon = GetFirstLiveMon();
+        struct Pokemon *mon = GetFirstLiveFollowMon();
         if (mon)
             ball = ItemIdToBallId(GetMonData(mon, MON_DATA_POKEBALL));
     }

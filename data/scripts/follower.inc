@@ -10,12 +10,12 @@ gText_FollowerDefault::
 gText_WantsToFly::
 	.string "{STR_VAR_1} looks up at the\nsky restlessly.\pWould you like to use FLY?$"
 
-.macro playfirstmoncry
-callfunc ScrFunc_playfirstmoncry
+.macro playfirstfollowmoncry
+callfunc ScrFunc_playfirstfollowmoncry
 .endm
 
-.macro bufferlivemonnickname out:req
-callfunc ScrFunc_bufferlivemonnickname
+.macro bufferlivefollowmonnickname out:req
+callfunc ScrFunc_bufferlivefollowmonnickname
 .byte \out
 .endm
 
@@ -27,8 +27,8 @@ callfunc ScrFunc_emote
 
 EventScript_Follower::
 	lock
-	bufferlivemonnickname 0
-	playfirstmoncry
+	bufferlivefollowmonnickname 0
+	playfirstfollowmoncry
 	callfunc ScrFunc_getfolloweraction
 EventScript_FollowerEnd::
 	waitfieldeffect FLDEFF_EMOTE
