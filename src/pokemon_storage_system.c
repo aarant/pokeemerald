@@ -598,7 +598,7 @@ EWRAM_DATA static bool8 sAutoActionOn = 0;
 
 EWRAM_DATA static u16 *sPaletteSwapBuffer = NULL; // dynamically-allocated buffer to hold box palettes
 EWRAM_DATA static u8 allocCount = 0; // Track number of alloc's vs frees
-
+EWRAM_DATA static u8 lastVCount = 0; // Track the VCount from the last HBlank to handle missed HBlanks
 // Main tasks
 static void EnterPokeStorage(u8);
 static void Task_InitPokeStorage(u8);
@@ -2143,12 +2143,15 @@ static void SetPokeStorageTask(TaskFunc newFunc)
 // Manages swapping palettes mid draw to make all icon palettes appear
 static void HBlankCB_PokeStorage(void) {
   u8 vCount = REG_VCOUNT;
+  if (vCount < lastVCount) {
+    lastVCount = 0;
+  }
   u32 i;
   if (vCount >= DISPLAY_HEIGHT || !sPaletteSwapBuffer || (gPaletteFade.active && gPaletteFade.y == 16 && gPaletteFade.mode == 2)) // HARDWARE_FADE
     return;
   // For each row in the pc box
   for (i = 0; i < IN_BOX_ROWS; i++) {
-    if (vCount == 28-8+24*i) { // -8 is to keep the right palette when being switched
+    if (lastVCount < 28-8+24*i && vCount >= 28-8+24*i) { // -8 is to keep the right palette when being switched
       u32 position = IN_BOX_COLUMNS*16*i;
       u16* dst = (u16*) (OBJ_PLTT + (i & 1 ? 7 : 1)*16*2); // Points into Palette RAM directly
       u32 j;
@@ -2161,14 +2164,15 @@ static void HBlankCB_PokeStorage(void) {
       break;
     }
   }
-  if (vCount == 146 && sStorage && sStorage->markingsSwapPal[0]) { // copy markings palette
+  if (lastVCount < 146 && vCount >= 146 && sStorage && sStorage->markingsSwapPal[0]) { // copy markings palette
     u16 *dst = (u16*) (OBJ_PLTT + (11+1)*16*2);
     CpuFastCopy(&sStorage->markingsSwapPal[0], dst, 32);
   }
-  if (vCount == 63 && sStorage && sStorage->chooseBoxSwapPal[0]) { // copy choose box palette
+  if (lastVCount < 63 && vCount >= 63 && sStorage && sStorage->chooseBoxSwapPal[0]) { // copy choose box palette
     u16 *dst = (u16*) (OBJ_PLTT + (0)*16*2);
     CpuFastCopy(sStorage->chooseBoxSwapPal, dst, 32);
   }
+  lastVCount = vCount;
 }
 
 static void DisableBoxMonDynamicPalette(u8 position, u8 count) {
