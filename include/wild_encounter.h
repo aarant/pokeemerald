@@ -8,6 +8,8 @@ struct WildPokemon
     u8 minLevel;
     u8 maxLevel;
     u16 species;
+    u8 metLocationOverride;
+    u8 metGameOverride;
 };
 
 struct WildPokemonInfo
@@ -21,7 +23,9 @@ struct WildPokemonHeader
     u8 mapGroup;
     u8 mapNum;
     const struct WildPokemonInfo *landMonsInfo;
+    const struct WildPokemonInfo *landMonsNightInfo;
     const struct WildPokemonInfo *waterMonsInfo;
+    const struct WildPokemonInfo *waterMonsNightInfo;
     const struct WildPokemonInfo *rockSmashMonsInfo;
     const struct WildPokemonInfo *fishingMonsInfo;
 };
